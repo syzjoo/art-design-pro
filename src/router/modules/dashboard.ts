@@ -16,7 +16,6 @@ export const dashboardRoutes: AppRouteRecord = {
       component: '/dashboard/console',
       meta: {
         title: 'menus.dashboard.console',
-        icon: 'ri:home-smile-2-line',
         keepAlive: false,
         fixedTab: true
       }
