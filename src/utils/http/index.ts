@@ -32,6 +32,10 @@ const UNAUTHORIZED_DEBOUNCE_TIME = 3000
 let isUnauthorizedErrorShown = false
 let unauthorizedTimer: NodeJS.Timeout | null = null
 
+/** Token刷新状态 */
+let isRefreshing = false
+let refreshSubscribers: ((token: string) => void)[] = []
+
 /** 扩展 AxiosRequestConfig */
 interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
   showErrorMessage?: boolean
@@ -85,11 +89,44 @@ axiosInstance.interceptors.response.use(
   (response: AxiosResponse<BaseResponse>) => {
     const { code, msg } = response.data
     if (code === ApiStatus.success) return response
-    if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
+    if (code === ApiStatus.unauthorized) {
+      // 尝试刷新token
+      return handleTokenRefresh(response.config as InternalAxiosRequestConfig)
+        .then(() => {
+          // 刷新成功后重试请求
+          return axiosInstance(response.config)
+        })
+        .catch(() => {
+          handleUnauthorizedError(msg)
+          throw createHttpError(msg || $t('httpMsg.unauthorized'), code)
+        })
+    }
     throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
   },
-  (error) => {
-    if (error.response?.status === ApiStatus.unauthorized) handleUnauthorizedError()
+  async (error) => {
+    if (error.response?.status === ApiStatus.unauthorized) {
+      try {
+        // 确保配置存在
+        if (!error.config) {
+          handleUnauthorizedError()
+          return Promise.reject(handleError(error))
+        }
+
+        // 尝试刷新token并获取新token
+        const newToken = await handleTokenRefresh(error.config as InternalAxiosRequestConfig)
+
+        // 确保配置中的token已更新
+        if (error.config.headers) {
+          error.config.headers.set('Authorization', newToken)
+        }
+
+        // 刷新成功后重试请求
+        return axiosInstance(error.config)
+      } catch {
+        // 由于handleUnauthorizedError会抛出异常，这里不需要再返回Promise.reject
+        handleUnauthorizedError()
+      }
+    }
     return Promise.reject(handleError(error))
   }
 )
@@ -128,6 +165,87 @@ function logOut() {
   setTimeout(() => {
     useUserStore().logOut()
   }, LOGOUT_DELAY)
+}
+
+/** 刷新Token */
+async function refreshToken() {
+  const userStore = useUserStore()
+  const { refreshToken } = userStore
+
+  if (!refreshToken) {
+    throw new Error('No refresh token available')
+  }
+
+  try {
+    // 直接使用axios实例，避免触发拦截器
+    const response = await axios.post<BaseResponse<{ accessToken: string }>>(
+      `${VITE_API_URL}/api/auth/refresh`,
+      { refreshToken },
+      {
+        timeout: REQUEST_TIMEOUT,
+        withCredentials: VITE_WITH_CREDENTIALS === 'true'
+      }
+    )
+
+    if (response.data.code === ApiStatus.success && response.data.data?.accessToken) {
+      const newAccessToken = response.data.data.accessToken
+      userStore.setToken(newAccessToken, refreshToken) // 保留原refreshToken
+      return newAccessToken
+    } else {
+      throw new Error('Token refresh failed')
+    }
+  } catch (error) {
+    console.error('Token refresh error:', error)
+    throw error
+  }
+}
+
+/** 处理Token刷新 */
+function handleTokenRefresh(config: InternalAxiosRequestConfig): Promise<string> {
+  // 如果正在刷新中，则将请求加入订阅队列
+  if (isRefreshing) {
+    return new Promise((resolve) => {
+      refreshSubscribers.push((token) => {
+        if (config.headers) {
+          config.headers.set('Authorization', token)
+        }
+        resolve(token)
+      })
+    })
+  }
+
+  // 开始刷新token
+  isRefreshing = true
+
+  return refreshToken()
+    .then((newToken) => {
+      // 通知所有订阅的请求
+      if (refreshSubscribers.length > 0) {
+        refreshSubscribers.forEach((callback) => {
+          try {
+            callback(newToken)
+          } catch (callbackError) {
+            console.error('Error in refresh subscriber callback:', callbackError)
+          }
+        })
+        refreshSubscribers = []
+      }
+
+      // 确保当前请求的token也已更新
+      if (config.headers) {
+        config.headers.set('Authorization', newToken)
+      }
+
+      return newToken
+    })
+    .catch((error) => {
+      // 刷新失败时清空订阅列表，避免后续请求持续等待
+      refreshSubscribers = []
+      throw error
+    })
+    .finally(() => {
+      isRefreshing = false
+    })
 }
 
 /** 是否需要重试 */

@@ -62,9 +62,9 @@ export const useUserStore = defineStore(
     // 搜索历史记录
     const searchHistory = ref<AppRouteRecord[]>([])
     // 访问令牌
-    const accessToken = ref('')
+    const accessToken = ref(localStorage.getItem('accessToken') || '')
     // 刷新令牌
-    const refreshToken = ref('')
+    const refreshToken = ref(localStorage.getItem('refreshToken') || '')
 
     // 计算属性：获取用户信息
     const getUserInfo = computed(() => info.value)
@@ -129,8 +129,10 @@ export const useUserStore = defineStore(
      */
     const setToken = (newAccessToken: string, newRefreshToken?: string) => {
       accessToken.value = newAccessToken
+      localStorage.setItem('accessToken', newAccessToken)
       if (newRefreshToken) {
         refreshToken.value = newRefreshToken
+        localStorage.setItem('refreshToken', newRefreshToken)
       }
     }
 
@@ -149,8 +151,10 @@ export const useUserStore = defineStore(
       lockPassword.value = ''
       // 清空访问令牌
       accessToken.value = ''
+      localStorage.removeItem('accessToken')
       // 清空刷新令牌
       refreshToken.value = ''
+      localStorage.removeItem('refreshToken')
       // 清空工作台已打开页面
       useWorktabStore().opened = []
       // 移除iframe路由缓存

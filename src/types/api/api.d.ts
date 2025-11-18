@@ -70,8 +70,19 @@ declare namespace Api {
 
     /** 登录响应 */
     interface LoginResponse {
-      token: string
+      user: UserInfo
+      accessToken: string
       refreshToken: string
+    }
+
+    /** 刷新令牌参数 */
+    interface RefreshTokenParams {
+      refreshToken: string
+    }
+
+    /** 刷新令牌响应 */
+    interface RefreshTokenResponse {
+      accessToken: string
     }
 
     /** 用户信息 */
@@ -82,6 +93,40 @@ declare namespace Api {
       userName: string
       email: string
       avatar?: string
+    }
+
+    /** 邮箱验证码响应 */
+    interface EmailCodeResponse {
+      code: number
+      message: string
+      data?: any
+    }
+
+    /** 注册参数 */
+    interface RegisterParams {
+      username: string
+      email: string
+      emailCode: string
+      password: string
+    }
+
+    /** 注册响应 */
+    interface RegisterResponse {
+      code: number
+      message: string
+      data?: any
+    }
+
+    /** 重置密码参数 */
+    interface ResetPasswordParams {
+      email: string
+      emailCode: string
+      password: string
+    }
+
+    /** 重置密码响应 */
+    interface ResetPasswordResponse extends BaseResponse {
+      data?: null
     }
   }
 
@@ -124,6 +169,7 @@ declare namespace Api {
       description: string
       enabled: boolean
       createTime: string
+      roleType: number
     }
 
     /** 角色搜索参数 */
@@ -131,5 +177,171 @@ declare namespace Api {
       Pick<RoleListItem, 'roleId' | 'roleName' | 'roleCode' | 'description' | 'enabled'> &
         Api.Common.CommonSearchParams
     >
+
+    /** 用户创建参数 */
+    interface UserCreateParams {
+      username: string
+      phone: string
+      gender: string
+      role: string[]
+      email?: string
+    }
+
+    /** 用户更新参数 */
+    interface UserUpdateParams {
+      username: string
+      phone: string
+      gender: string
+      role: string[]
+      email?: string
+    }
+
+    /** 角色创建参数 */
+    interface RoleCreateParams {
+      roleName: string
+      roleCode: string
+      description: string
+      enabled: boolean
+      roleType: number
+    }
+
+    /** 角色更新参数 */
+    interface RoleUpdateParams {
+      roleName: string
+      roleCode: string
+      description: string
+      enabled: boolean
+      roleType: number
+    }
+
+    /** 角色详情 */
+    interface RoleDetail {
+      roleId: number
+      roleName: string
+      roleCode: string
+      description: string
+      enabled: boolean
+      createTime: string
+      updateTime: string
+      roleType: number
+      menuIds?: number[]
+      permissionIds?: number[]
+    }
+
+    /** 权限 */
+    interface Permission {
+      id: number
+      name: string
+      code: string
+      description: string
+      menuId: number
+      createTime: string
+    }
+
+    /** 菜单 */
+    interface Menu {
+      id: number
+      name: string
+      path: string
+      component: string
+      icon?: string
+      parentId: number
+      sort: number
+      type: string
+      permissions?: Permission[]
+      children?: Menu[]
+    }
+
+    /** 菜单创建参数 */
+    interface MenuCreateParams {
+      name: string
+      path: string
+      label?: string
+      component: string
+      icon?: string
+      parentId: number
+      sort: number
+      type?: string
+      isEnable?: boolean
+      isMenu?: boolean
+      keepAlive?: boolean
+      isHide?: boolean
+      isHideTab?: boolean
+      link?: string
+      isIframe?: boolean
+      showBadge?: boolean
+      showTextBadge?: string
+      fixedTab?: boolean
+      activePath?: string
+      roles?: string[]
+      isFullPage?: boolean
+    }
+
+    /** 菜单更新参数 */
+    interface MenuUpdateParams {
+      id: number
+      name: string
+      path: string
+      label?: string
+      component: string
+      icon?: string
+      parentId?: number
+      sort: number
+      type?: string
+      isEnable?: boolean
+      isMenu?: boolean
+      keepAlive?: boolean
+      isHide?: boolean
+      isHideTab?: boolean
+      link?: string
+      isIframe?: boolean
+      showBadge?: boolean
+      showTextBadge?: string
+      fixedTab?: boolean
+      activePath?: string
+      roles?: string[]
+      isFullPage?: boolean
+    }
+
+    /** 权限按钮创建参数 */
+    interface PermissionCreateParams {
+      authName: string
+      authLabel: string
+      authIcon?: string
+      authSort: number
+      menuId: number
+    }
+
+    /** 权限按钮更新参数 */
+    interface PermissionUpdateParams {
+      id: number
+      authName: string
+      authLabel: string
+      authIcon?: string
+      authSort: number
+      menuId: number
+    }
+
+    /** 权限响应 */
+    interface PermissionResponse extends Api.Common.BaseResponse {
+      checkedKeys: string[]
+      halfCheckedKeys: string[]
+      checkedNodes: any[]
+      halfCheckedNodes: any[]
+    }
+
+    /** 角色权限保存参数 */
+    interface RolePermissionSaveParams {
+      /** 角色ID */
+      roleId: number
+      /** 选中的节点Key列表 */
+      checkedKeys: (string | number)[]
+      /** 半选中的节点Key列表 */
+      halfCheckedKeys?: (string | number)[]
+      checkedNodes?: any[]
+      halfCheckedNodes?: any[]
+      totalChecked?: number
+      totalHalfChecked?: number
+    }
   }
 }

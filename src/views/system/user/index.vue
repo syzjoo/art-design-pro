@@ -42,10 +42,17 @@
 </template>
 
 <script setup lang="ts">
+  import { ref, nextTick } from 'vue'
+  import { h } from 'vue'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { ACCOUNT_TABLE_DATA } from '@/mock/temp/formData'
   import { useTable } from '@/hooks/core/useTable'
-  import { fetchGetUserList } from '@/api/system-manage'
+  import {
+    fetchGetUserList,
+    fetchDeleteUser,
+    fetchCreateUser,
+    fetchUpdateUser
+  } from '@/api/system-manage'
   import UserSearch from './modules/user-search.vue'
   import UserDialog from './modules/user-dialog.vue'
   import { ElTag, ElMessageBox, ElImage } from 'element-plus'
@@ -59,6 +66,7 @@
   const dialogType = ref<DialogType>('add')
   const dialogVisible = ref(false)
   const currentUserData = ref<Partial<UserListItem>>({})
+  const isSubmitting = ref(false)
 
   // 选中行
   const selectedRows = ref<UserListItem[]>([])
@@ -146,7 +154,14 @@
           prop: 'userGender',
           label: '性别',
           sortable: true,
-          formatter: (row) => row.userGender
+          formatter: (row) => {
+            const genderMap = {
+              '0': '未知',
+              '1': '男',
+              '2': '女'
+            }
+            return genderMap[row.userGender as keyof typeof genderMap] || row.userGender
+          }
         },
         { prop: 'userPhone', label: '手机号' },
         {
@@ -207,7 +222,7 @@
    * @param params 参数
    */
   const handleSearch = (params: Record<string, any>) => {
-    console.log(params)
+    console.log('搜索参数:', params)
     // 搜索参数赋值
     Object.assign(searchParams, params)
     getData()
@@ -234,20 +249,52 @@
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'error'
-    }).then(() => {
-      ElMessage.success('注销成功')
+    }).then(async () => {
+      try {
+        // 调用删除用户API
+        await fetchDeleteUser(row.id)
+        // 删除成功后刷新数据
+        refreshData()
+      } catch (error: any) {
+        console.error('删除用户失败:', error)
+        // 错误处理由API内部自动处理
+      }
     })
   }
 
   /**
    * 处理弹窗提交事件
    */
-  const handleDialogSubmit = async () => {
+  const handleDialogSubmit = async (formData: any) => {
     try {
+      isSubmitting.value = true
+
+      // 准备提交数据
+      const submitData = {
+        username: formData.username,
+        phone: formData.phone,
+        gender: formData.gender,
+        role: formData.role,
+        email: formData.email
+      }
+
+      if (dialogType.value === 'add') {
+        // 创建用户
+        await fetchCreateUser(submitData)
+      } else if (dialogType.value === 'edit' && currentUserData.value.id) {
+        // 更新用户
+        await fetchUpdateUser(currentUserData.value.id, submitData)
+      }
+
+      // 操作成功后重置状态并刷新数据
       dialogVisible.value = false
       currentUserData.value = {}
-    } catch (error) {
+      refreshData()
+    } catch (error: any) {
       console.error('提交失败:', error)
+      // 错误处理由API内部自动处理
+    } finally {
+      isSubmitting.value = false
     }
   }
 

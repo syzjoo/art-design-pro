@@ -55,8 +55,16 @@
   import { useTableColumns } from '@/hooks/core/useTableColumns'
   import type { AppRouteRecord } from '@/types/router'
   import MenuDialog from './modules/menu-dialog.vue'
-  import { fetchGetMenuList } from '@/api/system-manage'
-  import { ElTag, ElMessageBox } from 'element-plus'
+  import {
+    fetchGetMenuList,
+    fetchCreateMenu,
+    fetchUpdateMenu,
+    fetchDeleteMenu,
+    fetchCreatePermission,
+    fetchUpdatePermission,
+    fetchDeletePermission
+  } from '@/api/system-manage'
+  import { ElTag, ElMessageBox, ElMessage } from 'element-plus'
 
   defineOptions({ name: 'Menus' })
 
@@ -107,6 +115,7 @@
 
     try {
       const list = await fetchGetMenuList()
+      console.log('list', list)
       tableData.value = list
     } catch (error) {
       throw error instanceof Error ? error : new Error('获取菜单失败')
@@ -175,14 +184,20 @@
         if (row.meta?.isAuthButton) {
           return row.meta?.authMark || ''
         }
-        if (!row.meta?.authList?.length) return ''
+        if (!row.meta?.authList || row.meta.authList.length === 0) return ''
         return `${row.meta.authList.length} 个权限标识`
       }
     },
     {
       prop: 'date',
       label: '编辑时间',
-      formatter: () => '2022-3-12 12:00:00'
+      formatter: (row: AppRouteRecord) => {
+        // 使用真实的时间数据，如果没有则显示当前时间
+        if (row.meta?.updateTime) {
+          return row.meta.updateTime
+        }
+        return new Date().toLocaleString()
+      }
     },
     {
       prop: 'status',
@@ -205,7 +220,7 @@
             }),
             h(ArtButtonTable, {
               type: 'delete',
-              onClick: () => handleDeleteAuth()
+              onClick: () => handleDeleteAuth(row)
             })
           ])
         }
@@ -213,7 +228,7 @@
         return h('div', buttonStyle, [
           h(ArtButtonTable, {
             type: 'add',
-            onClick: () => handleAddAuth(),
+            onClick: () => handleAddAuth(row),
             title: '新增权限'
           }),
           h(ArtButtonTable, {
@@ -222,7 +237,7 @@
           }),
           h(ArtButtonTable, {
             type: 'delete',
-            onClick: () => handleDeleteMenu()
+            onClick: () => handleDeleteMenu(row)
           })
         ])
       }
@@ -322,9 +337,15 @@
     for (const item of items) {
       const searchName = appliedFilters.name?.toLowerCase().trim() || ''
       const searchRoute = appliedFilters.route?.toLowerCase().trim() || ''
+      // 菜单名称现在来自meta.title（对应后端label字段）
       const menuTitle = formatMenuTitle(item.meta?.title || '').toLowerCase()
       const menuPath = (item.path || '').toLowerCase()
-      const nameMatch = !searchName || menuTitle.includes(searchName)
+      // 权限标识来自name字段，确保只对字符串调用toLowerCase
+      const permissionMark = typeof item.name === 'string' ? item.name.toLowerCase() : ''
+
+      // 搜索菜单名称或权限标识
+      const nameMatch =
+        !searchName || menuTitle.includes(searchName) || permissionMark.includes(searchName)
       const routeMatch = !searchRoute || menuPath.includes(searchRoute)
 
       if (item.children?.length) {
@@ -364,11 +385,13 @@
   /**
    * 添加权限按钮
    */
-  const handleAddAuth = (): void => {
+  const menuId = ref<number>()
+  const handleAddAuth = (row: AppRouteRecord): void => {
     dialogType.value = 'menu'
     editData.value = null
     lockMenuType.value = false
     dialogVisible.value = true
+    menuId.value = row.id
   }
 
   /**
@@ -400,40 +423,160 @@
    * 菜单表单数据类型
    */
   interface MenuFormData {
+    // 通用属性
+    id?: number
+
+    // 菜单特有属性
+    parentId?: number
     name: string
-    path: string
+    path?: string
+    label?: string
     component?: string
     icon?: string
-    roles?: string[]
+    isEnable?: boolean
     sort?: number
-    [key: string]: any
+    isMenu?: boolean
+    keepAlive?: boolean
+    isHide?: boolean
+    isHideTab?: boolean
+    link?: string
+    isIframe?: boolean
+    showBadge?: boolean
+    showTextBadge?: string
+    fixedTab?: boolean
+    activePath?: string
+    roles?: string[]
+    isFullPage?: boolean
+
+    // 权限按钮特有属性
+    menuId?: number
+    authName?: string
+    authLabel?: string
+    authIcon?: string
+    authSort?: number
   }
 
   /**
    * 提交表单数据
    * @param formData 表单数据
    */
-  const handleSubmit = (formData: MenuFormData): void => {
-    console.log('提交数据:', formData)
-    // TODO: 调用API保存数据
-    getMenuList()
+  const handleSubmit = async (
+    formData: MenuFormData & { menuType?: 'menu' | 'button' }
+  ): Promise<void> => {
+    try {
+      // 根据表单提交的menuType值决定调用哪个API，如果没有则使用dialogType.value
+      const submitType = formData.menuType || dialogType.value
+
+      if (submitType === 'menu') {
+        // 菜单
+        if (editData.value) {
+          // 编辑菜单
+          await fetchUpdateMenu({
+            id: Number(editData.value.id || 0),
+            name: formData.name || '',
+            path: formData.path || '',
+            label: formData.label || '',
+            component: formData.component || '',
+            icon: formData.icon || '',
+            isEnable: formData.isEnable ?? true,
+            sort: formData.sort || 1,
+            isMenu: formData.isMenu ?? true,
+            keepAlive: formData.keepAlive ?? false,
+            isHide: formData.isHide ?? false,
+            isHideTab: formData.isHideTab ?? false,
+            link: formData.link || '',
+            isIframe: formData.isIframe ?? false,
+            showBadge: formData.showBadge ?? false,
+            showTextBadge: formData.showTextBadge || '',
+            fixedTab: formData.fixedTab ?? false,
+            activePath: formData.activePath || '',
+            roles: formData.roles || [],
+            isFullPage: formData.isFullPage ?? false
+          })
+          ElMessage.success('菜单更新成功')
+        } else {
+          // 添加菜单
+          await fetchCreateMenu({
+            parentId: Number(menuId.value || 0),
+            name: formData.name || '',
+            path: formData.path || '',
+            label: formData.label || '',
+            component: formData.component || '',
+            icon: formData.icon || '',
+            isEnable: formData.isEnable ?? true,
+            sort: formData.sort || 1,
+            isMenu: formData.isMenu ?? true,
+            keepAlive: formData.keepAlive ?? false,
+            isHide: formData.isHide ?? false,
+            isHideTab: formData.isHideTab ?? false,
+            link: formData.link || '',
+            isIframe: formData.isIframe ?? false,
+            showBadge: formData.showBadge ?? false,
+            showTextBadge: formData.showTextBadge || '',
+            fixedTab: formData.fixedTab ?? false,
+            activePath: formData.activePath || '',
+            roles: formData.roles || [],
+            isFullPage: formData.isFullPage ?? false
+          })
+          ElMessage.success('菜单添加成功')
+          menuId.value = 0
+        }
+      } else if (submitType === 'button') {
+        // 权限按钮
+        if (editData.value) {
+          // 编辑权限按钮
+          await fetchUpdatePermission({
+            id: Number(editData.value.id),
+            menuId: Number(menuId.value),
+            authName: formData.authName || '',
+            authLabel: formData.authLabel || '',
+            authSort: formData.authSort || 1
+          })
+          ElMessage.success('权限更新成功')
+        } else {
+          // 添加权限按钮
+          await fetchCreatePermission({
+            menuId: Number(menuId.value),
+            authName: formData.authName || '',
+            authLabel: formData.authLabel || '',
+            authSort: formData.authSort || 1
+          })
+          ElMessage.success('权限添加成功')
+          menuId.value = 0
+        }
+      }
+      getMenuList()
+    } catch (error) {
+      ElMessage.error('操作失败，请重试')
+      console.error('菜单操作失败:', error)
+    }
   }
 
   /**
    * 删除菜单
    */
-  const handleDeleteMenu = async (): Promise<void> => {
+  const handleDeleteMenu = async (row?: AppRouteRecord): Promise<void> => {
+    // 优先使用传入的行数据
+    const targetRow = row || editData.value
+
+    if (!targetRow?.id) {
+      ElMessage.warning('请选择要删除的菜单')
+      return
+    }
+
     try {
       await ElMessageBox.confirm('确定要删除该菜单吗？删除后无法恢复', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       })
-      ElMessage.success('删除成功')
+
+      await fetchDeleteMenu(targetRow.id)
       getMenuList()
     } catch (error) {
       if (error !== 'cancel') {
         ElMessage.error('删除失败')
+        console.error('删除菜单失败:', error)
       }
     }
   }
@@ -441,18 +584,30 @@
   /**
    * 删除权限按钮
    */
-  const handleDeleteAuth = async (): Promise<void> => {
+  const handleDeleteAuth = async (row?: AppRouteRecord): Promise<void> => {
+    // 优先使用传入的行数据
+    const targetRow = row || editData.value
+    console.log(targetRow)
+    // 从targetRow.meta.authMark获取authMark
+    const authMark = targetRow.meta?.authMark
+    if (!authMark) {
+      ElMessage.warning('未找到权限标识(authMark)')
+      return
+    }
+
     try {
       await ElMessageBox.confirm('确定要删除该权限吗？删除后无法恢复', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       })
-      ElMessage.success('删除成功')
+
+      await fetchDeletePermission(authMark)
       getMenuList()
     } catch (error) {
       if (error !== 'cancel') {
         ElMessage.error('删除失败')
+        console.error('删除权限失败:', error)
       }
     }
   }

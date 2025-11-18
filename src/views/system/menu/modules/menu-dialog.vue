@@ -43,6 +43,7 @@
   import type { FormItem } from '@/components/core/forms/art-form/index.vue'
   import ArtForm from '@/components/core/forms/art-form/index.vue'
   import { useWindowSize } from '@vueuse/core'
+  import { ElMessage } from 'element-plus'
 
   const { width } = useWindowSize()
 
@@ -286,7 +287,7 @@
     try {
       await formRef.value.validate()
       emit('submit', { ...form })
-      ElMessage.success(`${isEdit.value ? '编辑' : '新增'}成功`)
+
       handleCancel()
     } catch {
       ElMessage.error('表单校验失败，请检查输入')

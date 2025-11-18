@@ -58,12 +58,12 @@
 <script setup lang="ts">
   import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
   import { useTable } from '@/hooks/core/useTable'
-  import { fetchGetRoleList } from '@/api/system-manage'
+  import { fetchGetRoleList, fetchDeleteRole } from '@/api/system-manage'
   import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
   import RoleSearch from './modules/role-search.vue'
   import RoleEditDialog from './modules/role-edit-dialog.vue'
   import RolePermissionDialog from './modules/role-permission-dialog.vue'
-  import { ElTag, ElMessageBox } from 'element-plus'
+  import { ElTag, ElMessageBox, ElMessage } from 'element-plus'
 
   defineOptions({ name: 'Role' })
 
@@ -230,10 +230,16 @@
       cancelButtonText: '取消',
       type: 'warning'
     })
-      .then(() => {
-        // TODO: 调用删除接口
-        ElMessage.success('删除成功')
-        refreshData()
+      .then(async () => {
+        try {
+          // 调用删除接口
+          await fetchDeleteRole(row.roleId)
+          ElMessage.success('删除成功')
+          refreshData()
+        } catch (error) {
+          console.error('删除角色失败:', error)
+          // 错误消息由API统一处理，这里可以不额外处理
+        }
       })
       .catch(() => {
         ElMessage.info('已取消删除')

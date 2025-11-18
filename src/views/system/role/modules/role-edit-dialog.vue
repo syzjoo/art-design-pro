@@ -21,6 +21,12 @@
           placeholder="请输入角色描述"
         />
       </ElFormItem>
+      <ElFormItem label="角色类型" prop="roleType">
+        <ElSelect v-model="form.roleType" placeholder="请选择角色类型">
+          <ElOption label="普通角色" :value="0" />
+          <ElOption label="系统内置角色" :value="1" />
+        </ElSelect>
+      </ElFormItem>
       <ElFormItem label="启用">
         <ElSwitch v-model="form.enabled" />
       </ElFormItem>
@@ -34,6 +40,8 @@
 
 <script setup lang="ts">
   import type { FormInstance, FormRules } from 'element-plus'
+  import { ElMessage } from 'element-plus'
+  import { fetchCreateRole, fetchUpdateRole } from '@/api/system-manage'
 
   type RoleListItem = Api.SystemManage.RoleListItem
 
@@ -90,7 +98,8 @@
     roleCode: '',
     description: '',
     createTime: '',
-    enabled: true
+    enabled: true,
+    roleType: 0
   })
 
   /**
@@ -128,7 +137,8 @@
         roleCode: '',
         description: '',
         createTime: '',
-        enabled: true
+        enabled: true,
+        roleType: 0
       })
     }
   }
@@ -150,13 +160,30 @@
 
     try {
       await formRef.value.validate()
-      // TODO: 调用新增/编辑接口
+
+      // 准备提交数据
+      const submitData = {
+        roleName: form.roleName,
+        roleCode: form.roleCode,
+        description: form.description,
+        enabled: form.enabled,
+        roleType: form.roleType
+      }
+
+      // 根据弹窗类型调用不同接口
+      if (props.dialogType === 'add') {
+        await fetchCreateRole(submitData)
+      } else if (props.dialogType === 'edit' && props.roleData) {
+        await fetchUpdateRole(props.roleData.roleId, submitData)
+      }
+
       const message = props.dialogType === 'add' ? '新增成功' : '修改成功'
       ElMessage.success(message)
       emit('success')
       handleClose()
     } catch (error) {
-      console.log('表单验证失败:', error)
+      console.log('表单验证或提交失败:', error)
+      // 错误消息由API统一处理，这里可以不额外处理
     }
   }
 </script>
