@@ -172,7 +172,7 @@
   // 处理倒计时
   const handleCountdown = () => {
     countdown.value = 60 // 60秒倒计时
-    countdownTimer = setInterval(() => {
+    countdownTimer = window.setInterval(() => {
       countdown.value--
       if (countdown.value <= 0) {
         clearCountdown()

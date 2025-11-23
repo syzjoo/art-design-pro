@@ -305,12 +305,14 @@
 
       if (item.meta?.authList?.length) {
         const authChildren: AppRouteRecord[] = item.meta.authList.map(
-          (auth: { title: string; authMark: string }) => ({
+          (auth: { title: string; authMark: string; id?: number }) => ({
+            id: auth.id,
             path: `${item.path}_auth_${auth.authMark}`,
             name: `${String(item.name)}_auth_${auth.authMark}`,
             meta: {
               title: auth.title,
               authMark: auth.authMark,
+              id: auth.id,
               isAuthButton: true,
               parentPath: item.path
             }
@@ -413,7 +415,8 @@
     dialogType.value = 'button'
     editData.value = {
       title: row.meta?.title,
-      authMark: row.meta?.authMark
+      authMark: row.meta?.authMark,
+      id: row.meta?.id
     }
     lockMenuType.value = false
     dialogVisible.value = true
@@ -461,7 +464,7 @@
    * @param formData 表单数据
    */
   const handleSubmit = async (
-    formData: MenuFormData & { menuType?: 'menu' | 'button' }
+    formData: MenuFormData & { menuType?: 'menu' | 'button'; authRoles?: string[] }
   ): Promise<void> => {
     try {
       // 根据表单提交的menuType值决定调用哪个API，如果没有则使用dialogType.value
@@ -472,7 +475,7 @@
         if (editData.value) {
           // 编辑菜单
           await fetchUpdateMenu({
-            id: Number(editData.value.id || 0),
+            id: Number(editData.value.id),
             name: formData.name || '',
             path: formData.path || '',
             label: formData.label || '',
@@ -493,7 +496,6 @@
             roles: formData.roles || [],
             isFullPage: formData.isFullPage ?? false
           })
-          ElMessage.success('菜单更新成功')
         } else {
           // 添加菜单
           await fetchCreateMenu({
@@ -518,21 +520,25 @@
             roles: formData.roles || [],
             isFullPage: formData.isFullPage ?? false
           })
-          ElMessage.success('菜单添加成功')
           menuId.value = 0
         }
       } else if (submitType === 'button') {
         // 权限按钮
         if (editData.value) {
           // 编辑权限按钮
-          await fetchUpdatePermission({
-            id: Number(editData.value.id),
-            menuId: Number(menuId.value),
-            authName: formData.authName || '',
-            authLabel: formData.authLabel || '',
-            authSort: formData.authSort || 1
-          })
-          ElMessage.success('权限更新成功')
+          const authLabel = formData.authLabel || ''
+          if (authLabel.trim() !== '') {
+            await fetchUpdatePermission({
+              id: Number(editData.value.id),
+              authLabel: authLabel.trim(),
+              menuId: Number(menuId.value) || 0,
+              authName: formData.authName || '',
+              authSort: formData.authSort || 1
+            })
+            ElMessage.success('权限更新成功')
+          } else {
+            throw new Error('权限标识不能为空')
+          }
         } else {
           // 添加权限按钮
           await fetchCreatePermission({
@@ -587,13 +593,12 @@
   const handleDeleteAuth = async (row?: AppRouteRecord): Promise<void> => {
     // 优先使用传入的行数据
     const targetRow = row || editData.value
-    console.log(targetRow)
-    // 从targetRow.meta.authMark获取authMark
-    const authMark = targetRow.meta?.authMark
-    if (!authMark) {
-      ElMessage.warning('未找到权限标识(authMark)')
+    // 检查是否有权限ID
+    if (!targetRow?.id) {
+      ElMessage.warning('未找到权限ID')
       return
     }
+    console.log('权限ID:', targetRow.id)
 
     try {
       await ElMessageBox.confirm('确定要删除该权限吗？删除后无法恢复', '提示', {
@@ -602,7 +607,7 @@
         type: 'warning'
       })
 
-      await fetchDeletePermission(authMark)
+      await fetchDeletePermission(targetRow.id)
       getMenuList()
     } catch (error) {
       if (error !== 'cancel') {

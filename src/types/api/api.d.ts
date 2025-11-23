@@ -314,6 +314,7 @@ declare namespace Api {
 
     /** 权限按钮更新参数 */
     interface PermissionUpdateParams {
+      /** 权限ID */
       id: number
       authName: string
       authLabel: string

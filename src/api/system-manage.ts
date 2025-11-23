@@ -106,7 +106,7 @@ export function fetchCreatePermission(data: Api.SystemManage.PermissionCreatePar
   })
 }
 
-// 更新权限按钮
+// 更新权限按钮 - 使用id作为标识符
 export function fetchUpdatePermission(data: Api.SystemManage.PermissionUpdateParams) {
   return request.put<BaseResponse>({
     url: `/api/system/permissions/${data.id}`,
@@ -116,10 +116,10 @@ export function fetchUpdatePermission(data: Api.SystemManage.PermissionUpdatePar
   })
 }
 
-// 删除权限按钮 - 仅支持authMark，不再支持ID
-export function fetchDeletePermission(authMark: string) {
+// 删除权限按钮 - 使用id作为标识符
+export function fetchDeletePermission(id: number) {
   return request.del<BaseResponse>({
-    url: `/api/system/permissions/${authMark}`,
+    url: `/api/system/permissions/${id}`,
     showSuccessMessage: true,
     showErrorMessage: true
   })
