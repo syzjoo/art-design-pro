@@ -93,7 +93,9 @@
     keyword: '',
     category_id: 0,
     tag_id: 0,
-    status: 0
+    status: 0,
+    top: 0,
+    hot: 0
   }
 
   const formFilters = reactive({ ...initialSearchState })
@@ -151,6 +153,28 @@
         { value: 1, label: '已发布' },
         { value: 2, label: '草稿' }
       ]
+    },
+    {
+      label: '置顶',
+      key: 'top',
+      type: 'select',
+      placeholder: '置顶状态',
+      options: [
+        { value: 0, label: '全部' },
+        { value: 1, label: '已置顶' },
+        { value: 2, label: '未置顶' }
+      ]
+    },
+    {
+      label: '热门',
+      key: 'hot',
+      type: 'select',
+      placeholder: '热门状态',
+      options: [
+        { value: 0, label: '全部' },
+        { value: 1, label: '热门' },
+        { value: 2, label: '非热门' }
+      ]
     }
   ])
 
@@ -160,7 +184,9 @@
     yearVal: '',
     category_id: appliedFilters.category_id === 0 ? null : appliedFilters.category_id,
     tag_id: appliedFilters.tag_id === 0 ? null : appliedFilters.tag_id,
-    status: appliedFilters.status === 0 ? null : appliedFilters.status
+    status: appliedFilters.status === 0 ? null : appliedFilters.status,
+    top: appliedFilters.top === 0 ? null : appliedFilters.top,
+    hot: appliedFilters.hot === 0 ? null : appliedFilters.hot
   }))
 
   // 表格列配置 - 使用和菜单列表相同的方式定义

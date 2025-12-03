@@ -60,6 +60,21 @@
         <el-form-item label="类型名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入类型名称" />
         </el-form-item>
+        <el-form-item label="类型编码" prop="code">
+          <el-input v-model="formData.code" placeholder="请输入类型编码（英文/数字）" />
+        </el-form-item>
+        <el-form-item label="类型图标" prop="icon">
+          <el-input v-model="formData.icon" placeholder="请输入图标名称" />
+        </el-form-item>
+        <el-form-item label="类型状态" prop="status">
+          <el-switch
+            v-model="formData.status"
+            :active-value="1"
+            :inactive-value="0"
+            active-text="启用"
+            inactive-text="禁用"
+          />
+        </el-form-item>
         <el-form-item label="类型描述" prop="description">
           <el-input
             v-model="formData.description"
@@ -68,8 +83,13 @@
             placeholder="请输入类型描述（可选）"
           />
         </el-form-item>
-        <el-form-item label="类型排序" prop="sort">
-          <el-input-number v-model="formData.sort" :min="0" :max="999" placeholder="请输入排序号" />
+        <el-form-item label="类型排序" prop="sortOrder">
+          <el-input-number
+            v-model="formData.sortOrder"
+            :min="0"
+            :max="999"
+            placeholder="请输入排序号"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -95,10 +115,15 @@
   interface ArticleType {
     id: number
     name: string
+    code: string
     description: string
-    sort: number
-    article_count: number
-    create_time: string
+    icon: string
+    status: number
+    sortOrder: number
+    createBy: number
+    updateBy: number
+    createTime: string
+    updateTime: string
   }
 
   // 响应式数据
@@ -115,10 +140,15 @@
   const formData = reactive({
     id: 0,
     name: '',
+    code: '',
     description: '',
-    sort: 0,
-    article_count: 0,
-    create_time: ''
+    icon: 'document',
+    status: 1,
+    sortOrder: 0,
+    createBy: 0,
+    updateBy: 0,
+    createTime: '',
+    updateTime: ''
   })
 
   // 表格数据和分页
@@ -135,8 +165,12 @@
       { required: true, message: '请输入类型名称', trigger: 'blur' },
       { min: 1, max: 20, message: '类型名称长度在 1 到 20 个字符', trigger: 'blur' }
     ],
+    code: [
+      { required: true, message: '请输入类型编码', trigger: 'blur' },
+      { min: 1, max: 20, message: '类型编码长度在 1 到 20 个字符', trigger: 'blur' }
+    ],
     description: [{ max: 100, message: '类型描述长度不能超过 100 个字符', trigger: 'blur' }],
-    sort: [
+    sortOrder: [
       { required: true, message: '请输入排序号', trigger: 'blur' },
       {
         type: 'number' as const,
@@ -162,42 +196,67 @@
           {
             id: 1,
             name: '技术文章',
+            code: 'TECHNICAL',
             description: '分享技术经验和开发技巧的文章',
-            sort: 1,
-            article_count: 25,
-            create_time: '2024-01-01 10:00:00'
+            icon: 'document',
+            status: 1,
+            sortOrder: 1,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 10:00:00',
+            updateTime: '2024-01-01 10:00:00'
           },
           {
             id: 2,
             name: '教程',
+            code: 'TUTORIAL',
             description: '详细的技术教程和学习指南',
-            sort: 2,
-            article_count: 18,
-            create_time: '2024-01-01 11:00:00'
+            icon: 'school',
+            status: 1,
+            sortOrder: 2,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 11:00:00',
+            updateTime: '2024-01-01 11:00:00'
           },
           {
             id: 3,
             name: '博客',
+            code: 'BLOG',
             description: '个人观点和经验分享',
-            sort: 3,
-            article_count: 15,
-            create_time: '2024-01-01 12:00:00'
+            icon: 'edit',
+            status: 1,
+            sortOrder: 3,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 12:00:00',
+            updateTime: '2024-01-01 12:00:00'
           },
           {
             id: 4,
             name: '新闻',
+            code: 'NEWS',
             description: '技术资讯和行业动态',
-            sort: 4,
-            article_count: 20,
-            create_time: '2024-01-01 13:00:00'
+            icon: 'message',
+            status: 1,
+            sortOrder: 4,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 13:00:00',
+            updateTime: '2024-01-01 13:00:00'
           },
           {
             id: 5,
             name: '工具分享',
+            code: 'TOOL',
             description: '开发工具和资源推荐',
-            sort: 5,
-            article_count: 8,
-            create_time: '2024-01-01 14:00:00'
+            icon: 'tools',
+            status: 0,
+            sortOrder: 5,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 14:00:00',
+            updateTime: '2024-01-01 14:00:00'
           }
         ]
         resolve(mockTypes)
@@ -211,7 +270,8 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center'
+      align: 'center',
+      fixed: 'left'
     },
     {
       prop: 'name',
@@ -219,28 +279,55 @@
       width: 180
     },
     {
-      prop: 'description',
-      label: '类型描述',
-      minWidth: 200
+      prop: 'code',
+      label: '类型编码',
+      width: 150,
+      align: 'center'
     },
     {
-      prop: 'sort',
+      prop: 'icon',
+      label: '图标',
+      width: 100,
+      align: 'center',
+      formatter: (row: ArticleType) => {
+        return h('span', { class: 'icon-wrapper' }, row.icon)
+      }
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 100,
+      align: 'center',
+      formatter: (row: ArticleType) => {
+        return h(
+          'el-tag',
+          {
+            type: row.status === 1 ? 'success' : 'danger'
+          },
+          row.status === 1 ? '启用' : '禁用'
+        )
+      }
+    },
+    {
+      prop: 'sortOrder',
       label: '排序号',
       width: 100,
       align: 'center'
     },
     {
-      prop: 'article_count',
-      label: '文章数量',
-      width: 120,
-      align: 'center'
+      prop: 'createTime',
+      label: '创建时间',
+      width: 180,
+      formatter: (row: ArticleType) => {
+        return h('p', {}, formatDate(row.createTime))
+      }
     },
     {
-      prop: 'create_time',
-      label: '创建时间',
-      width: 200,
+      prop: 'updateTime',
+      label: '更新时间',
+      width: 180,
       formatter: (row: ArticleType) => {
-        return h('p', {}, formatDate(row.create_time))
+        return h('p', {}, formatDate(row.updateTime))
       }
     },
     {
@@ -248,6 +335,7 @@
       label: '操作',
       width: 180,
       align: 'right',
+      fixed: 'right',
       formatter: (row: ArticleType) => {
         const buttonStyle = { style: 'text-align: right' }
 
@@ -279,6 +367,7 @@
           mockTypes = mockTypes.filter(
             (type) =>
               type.name.toLowerCase().includes(searchForm.name.toLowerCase()) ||
+              type.code.toLowerCase().includes(searchForm.name.toLowerCase()) ||
               type.description.toLowerCase().includes(searchForm.name.toLowerCase())
           )
         }
@@ -330,10 +419,15 @@
   const resetFormData = () => {
     formData.id = 0
     formData.name = ''
+    formData.code = ''
     formData.description = ''
-    formData.sort = 0
-    formData.article_count = 0
-    formData.create_time = ''
+    formData.icon = 'document'
+    formData.status = 1
+    formData.sortOrder = 0
+    formData.createBy = 0
+    formData.updateBy = 0
+    formData.createTime = ''
+    formData.updateTime = ''
     if (formRef.value) {
       formRef.value.resetFields()
     }

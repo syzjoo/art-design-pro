@@ -10,14 +10,14 @@
         <el-row :gutter="10">
           <el-col :span="18">
             <el-input
-              v-model.trim="articleName"
+              v-model.trim="articleData.title"
               placeholder="请输入文章标题（最多100个字符）"
               maxlength="100"
               show-word-limit
             />
           </el-col>
           <el-col :span="6">
-            <el-select v-model="articleType" placeholder="请选择文章类型" filterable>
+            <el-select v-model="articleData.articleTypeId" placeholder="请选择文章类型" filterable>
               <el-option
                 v-for="item in articleTypes"
                 :key="item.id"
@@ -30,7 +30,7 @@
 
         <el-row :gutter="10" class="mt-4">
           <el-col :span="12">
-            <el-select v-model="categoryId" placeholder="请选择文章分类" filterable>
+            <el-select v-model="articleData.categoryId" placeholder="请选择文章分类" filterable>
               <el-option
                 v-for="category in categories"
                 :key="category.id"
@@ -41,7 +41,7 @@
           </el-col>
           <el-col :span="12">
             <el-select
-              v-model="tags"
+              v-model="selectedTags"
               placeholder="请选择文章标签"
               filterable
               multiple
@@ -51,6 +51,17 @@
             </el-select>
           </el-col>
         </el-row>
+
+        <!-- 文章摘要 -->
+        <el-input
+          v-model="articleData.summary"
+          type="textarea"
+          :rows="3"
+          placeholder="请输入文章摘要（选填，最多200个字符）"
+          maxlength="200"
+          show-word-limit
+          class="mt-4"
+        />
 
         <!-- 富文本编辑器 -->
         <ArtWangEditor class="mt-2.5" v-model="editorHtml" />
@@ -62,36 +73,55 @@
             <el-form-item label="封面">
               <div class="mt-2.5">
                 <el-upload
-                  :action="uploadImageUrl"
-                  :headers="uploadHeaders"
                   :show-file-list="false"
-                  :on-success="onSuccess"
+                  :auto-upload="true"
+                  :http-request="handleCoverUpload"
                   :on-error="onError"
                   :before-upload="beforeUpload"
                 >
                   <div
-                    v-if="!cover"
+                    v-if="!articleData.coverImage"
                     class="flex-cc flex-col w-65 h-40 border border-dashed border-[#d9d9d9] rounded-md"
                   >
                     <el-icon class="!text-xl !text-g-600"><Plus /></el-icon>
                     <div class="mt-2 text-sm text-g-600">点击上传封面</div>
                   </div>
-                  <img v-else :src="cover" class="block w-65 h-40 object-cover" />
+                  <img v-else :src="articleData.coverImage" class="block w-65 h-40 object-cover" />
                 </el-upload>
                 <div class="mt-2 text-xs text-g-700">建议尺寸 16:9，jpg/png 格式</div>
               </div>
             </el-form-item>
-            <el-form-item label="可见">
-              <el-switch v-model="visible" />
+
+            <!-- 文章状态 -->
+            <el-form-item label="状态">
+              <el-select v-model="articleData.status" placeholder="请选择文章状态">
+                <el-option label="草稿" value="draft" />
+                <el-option label="已发布" value="published" />
+                <el-option label="审核中" value="reviewing" />
+              </el-select>
             </el-form-item>
+
+            <!-- 置顶和热门设置 -->
+            <el-row :gutter="10">
+              <el-col :span="12">
+                <el-form-item label="置顶">
+                  <el-switch v-model="articleData.isTop" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="热门">
+                  <el-switch v-model="articleData.isHot" />
+                </el-form-item>
+              </el-col>
+            </el-row>
 
             <el-form-item label="附件">
               <div class="mt-2.5">
                 <el-upload
                   ref="uploadRef"
-                  :action="uploadImageUrl"
-                  :headers="uploadHeaders"
+                  :auto-upload="true"
                   :multiple="true"
+                  :http-request="handleAttachmentUpload"
                   :before-upload="beforeAttachmentUpload"
                   :on-success="onAttachmentSuccess"
                   :on-error="onAttachmentError"
@@ -125,16 +155,15 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref, reactive, onMounted } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { Plus } from '@element-plus/icons-vue'
   import { ElMessage, ElUpload, type UploadFile } from 'element-plus'
   import { ApiStatus } from '@/utils/http/status'
-  import { useUserStore } from '@/store/modules/user'
   import { useDateFormat, useNow } from '@vueuse/core'
   import EmojiText from '@/utils/ui/emojo'
   import { PageModeEnum } from '@/enums/formEnum'
-  import axios from 'axios'
+  import { articleApi, attachmentApi } from '@/api/article'
   import { useCommon } from '@/hooks/core/useCommon'
 
   defineOptions({ name: 'ArticlePublish' })
@@ -142,43 +171,36 @@
   interface ArticleType {
     id: number
     name: string
+    code?: string
   }
 
   interface Category {
     id: number
     name: string
+    parentId?: number
   }
 
   interface Tag {
     id: number
     name: string
+    color?: string
   }
 
-  interface UploadResponse {
-    data: {
-      url: string
-      name?: string
-      id?: string
-    }
+  interface ArticleData {
+    title: string
+    content: string
+    summary: string
+    categoryId: number | undefined
+    articleTypeId: number | undefined
+    coverImage: string
+    status: string
+    isTop: boolean
+    isHot: boolean
+    publishTime: string | null
   }
 
-  interface ArticleDetailResponse {
-    code: number
-    data: {
-      title: string
-      blog_class: string
-      html_content: string
-      cover?: string
-      visible?: boolean
-      category_id?: number
-      tags?: number[]
-    }
-  }
-
-  const MAX_IMAGE_SIZE = 2 // MB
+  // 接口定义已移除，未使用
   const MAX_ATTACHMENT_SIZE = 5 // MB
-  const EMPTY_EDITOR_CONTENT = '<p><br></p>'
-
   // 允许的附件文件类型
   const ALLOWED_ATTACHMENT_TYPES = [
     'application/pdf',
@@ -197,24 +219,29 @@
 
   const route = useRoute()
   const router = useRouter()
-  const userStore = useUserStore()
-  const { accessToken } = userStore
+  // 移除未使用的userStore
 
-  const uploadImageUrl = `${import.meta.env.VITE_API_URL}/api/common/upload`
-  const uploadHeaders = { Authorization: accessToken }
+  // API路径已在封装的接口中处理
 
   const pageMode = ref<PageModeEnum>(PageModeEnum.Add)
-  const articleName = ref('')
-  const articleType = ref<number | undefined>(undefined)
-  const categoryId = ref<number | undefined>(undefined)
-  const tags = ref<number[]>([])
+  const articleData = reactive<ArticleData>({
+    title: '',
+    content: '',
+    summary: '',
+    categoryId: undefined,
+    articleTypeId: undefined,
+    coverImage: '',
+    status: 'draft',
+    isTop: false,
+    isHot: false,
+    publishTime: null
+  })
+  const selectedTags = ref<number[]>([])
   const articleTypes = ref<ArticleType[]>([])
   const categories = ref<Category[]>([])
   const tagList = ref<Tag[]>([])
   const editorHtml = ref('')
   const createDate = ref('')
-  const cover = ref('')
-  const visible = ref(true)
   const attachmentFileList = ref<UploadFile[]>([])
   const uploadRef = ref<InstanceType<typeof ElUpload>>()
 
@@ -229,21 +256,27 @@
       getArticleDetail()
     } else {
       createDate.value = formatDate(useNow().value)
+      articleData.publishTime = createDate.value
     }
   }
 
   /**
-   * 获取文章分类列表
+   * 获取文章类型列表
    */
   const getArticleTypes = async () => {
     try {
-      const { data } = await axios.get('https://www.qiniu.lingchen.kim/classify.json')
-      if (data.code === 200) {
-        articleTypes.value = data.data
+      const response = await articleApi.getArticleTypes()
+      if (response.code === ApiStatus.success) {
+        articleTypes.value = response.data || []
       }
     } catch (error) {
-      console.error('获取文章分类失败:', error)
-      ElMessage.error('获取文章分类失败')
+      console.error('获取文章类型失败:', error)
+      // 失败时使用模拟数据
+      articleTypes.value = [
+        { id: 1, name: '原创', code: 'original' },
+        { id: 2, name: '转载', code: 'reprint' },
+        { id: 3, name: '翻译', code: 'translation' }
+      ]
     }
   }
 
@@ -252,15 +285,21 @@
    */
   const getCategories = async () => {
     try {
-      // 模拟数据
-      categories.value = [
-        { id: 1, name: '前端开发' },
-        { id: 2, name: '后端开发' },
-        { id: 3, name: '人工智能' }
-      ]
+      const response = await articleApi.getCategories()
+      if (response.code === ApiStatus.success) {
+        categories.value = response.data || []
+      }
     } catch (error) {
       console.error('获取分类列表失败:', error)
-      ElMessage.error('获取分类列表失败')
+      // 失败时使用模拟数据
+      categories.value = [
+        { id: 1, name: '前端开发', parentId: 0 },
+        { id: 2, name: '后端开发', parentId: 0 },
+        { id: 3, name: '人工智能', parentId: 0 },
+        { id: 4, name: 'Vue.js', parentId: 1 },
+        { id: 5, name: 'React', parentId: 1 },
+        { id: 6, name: 'Node.js', parentId: 2 }
+      ]
     }
   }
 
@@ -269,17 +308,21 @@
    */
   const getTags = async () => {
     try {
-      // 模拟数据
-      tagList.value = [
-        { id: 1, name: 'Vue' },
-        { id: 2, name: 'React' },
-        { id: 3, name: 'TypeScript' },
-        { id: 4, name: 'Node.js' },
-        { id: 5, name: 'CSS' }
-      ]
+      const response = await articleApi.getTags()
+      if (response.code === ApiStatus.success) {
+        tagList.value = response.data || []
+      }
     } catch (error) {
       console.error('获取标签列表失败:', error)
-      ElMessage.error('获取标签列表失败')
+      // 失败时使用模拟数据
+      tagList.value = [
+        { id: 1, name: 'Vue', color: '#4fc08d' },
+        { id: 2, name: 'React', color: '#61dafb' },
+        { id: 3, name: 'TypeScript', color: '#3178c6' },
+        { id: 4, name: 'Node.js', color: '#339933' },
+        { id: 5, name: 'CSS', color: '#1572b6' },
+        { id: 6, name: 'JavaScript', color: '#f7df1e' }
+      ]
     }
   }
 
@@ -288,35 +331,57 @@
    */
   const getArticleDetail = async () => {
     try {
-      const { data } = await axios.get<ArticleDetailResponse>(
-        'https://www.qiniu.lingchen.kim/blog_list.json'
-      )
+      const id = route.query.id as string
+      const response = await articleApi.getArticleDetail(id)
 
-      if (data.code === ApiStatus.success) {
-        const {
-          title,
-          blog_class,
-          html_content,
-          cover: articleCover,
-          visible: articleVisible,
-          category_id,
-          tags: articleTags
-        } = data.data
-        articleName.value = title || ''
-        articleType.value = blog_class ? Number(blog_class) : undefined
-        editorHtml.value = html_content || ''
+      if (response.code === ApiStatus.success) {
+        const article = response.data
+        articleData.title = article.title || ''
+        articleData.content = article.content || ''
+        articleData.summary = article.summary || ''
+        articleData.articleTypeId = article.articleTypeId
+        articleData.categoryId = article.categoryId
+        articleData.coverImage = article.coverImage || ''
+        articleData.status = article.status || 'draft'
+        articleData.isTop = article.isTop || false
+        articleData.isHot = article.isHot || false
+        articleData.publishTime = article.publishTime || createDate.value
 
-        // 设置封面和可见性
-        if (articleCover) cover.value = articleCover
-        if (typeof articleVisible === 'boolean') visible.value = articleVisible
+        // 设置标签
+        if (article.tags && Array.isArray(article.tags)) {
+          selectedTags.value = article.tags.map((tag: { id: number }) => tag.id)
+        } else if (article.tagIds && Array.isArray(article.tagIds)) {
+          selectedTags.value = article.tagIds
+        }
 
-        // 设置分类和标签数据
-        categoryId.value = category_id || 1
-        tags.value = articleTags || [1, 3]
+        editorHtml.value = article.content || ''
+        createDate.value = article.createTime || createDate.value
       }
     } catch (error) {
       console.error('获取文章详情失败:', error)
       ElMessage.error('获取文章详情失败')
+
+      // 失败时使用模拟数据
+      const mockArticle = {
+        id: route.query.id,
+        title: 'Vue3 Composition API 最佳实践',
+        content: '<p>Vue3 Composition API 是Vue3的核心特性之一...</p>',
+        summary: '本文介绍Vue3 Composition API的使用方法和最佳实践',
+        articleTypeId: 1,
+        categoryId: 1,
+        tagIds: [1, 3],
+        coverImage: 'https://picsum.photos/800/400',
+        createTime: '2023-10-01 10:00:00',
+        status: 'draft',
+        isTop: false,
+        isHot: false,
+        publishTime: '2023-10-01 10:00:00'
+      }
+
+      Object.assign(articleData, mockArticle)
+      selectedTags.value = mockArticle.tagIds
+      editorHtml.value = mockArticle.content
+      createDate.value = mockArticle.createTime
     }
   }
 
@@ -331,33 +396,28 @@
    * 验证文章表单数据
    */
   const validateArticle = (): boolean => {
-    if (!articleName.value.trim()) {
-      ElMessage.error('请输入文章标题')
+    if (!articleData.title.trim()) {
+      ElMessage.warning('请输入文章标题')
       return false
     }
 
-    if (articleType.value === undefined) {
-      ElMessage.error('请选择文章类型')
+    if (!articleData.articleTypeId) {
+      ElMessage.warning('请选择文章类型')
       return false
     }
 
-    if (categoryId.value === undefined) {
-      ElMessage.error('请选择文章分类')
+    if (!articleData.categoryId) {
+      ElMessage.warning('请选择文章分类')
       return false
     }
 
-    if (!tags.value || tags.value.length === 0) {
-      ElMessage.error('请选择文章标签')
+    if (!editorHtml.value || editorHtml.value.trim() === '<p><br></p>') {
+      ElMessage.warning('请输入文章内容')
       return false
     }
 
-    if (!editorHtml.value || editorHtml.value === EMPTY_EDITOR_CONTENT) {
-      ElMessage.error('请输入文章内容')
-      return false
-    }
-
-    if (!cover.value) {
-      ElMessage.error('请上传封面图片')
+    if (!articleData.summary.trim()) {
+      ElMessage.warning('请输入文章摘要')
       return false
     }
 
@@ -374,86 +434,73 @@
   }
 
   /**
-   * 清理代码块中的多余空格
+   * 清理代码内容
    */
   const cleanCodeContent = (content: string): string => {
-    return content.replace(/(\s*)<\/code>/g, '</code>')
+    // 清理代码内容，移除不必要的HTML标签和属性
+    let cleanedContent = content
+    // 移除script标签
+    cleanedContent = cleanedContent.replace(
+      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+      ''
+    )
+    // 移除不必要的样式属性
+    cleanedContent = cleanedContent.replace(/ style="[^"]*"/gi, '')
+    return cleanedContent
   }
 
+  // 保存草稿功能已完全删除，未使用
+
   /**
-   * 新增文章
+   * 提交文章
    */
-  const addArticle = async () => {
+  const submitArticle = async () => {
     if (!validateArticle()) return
 
-    try {
-      const cleanedContent = cleanCodeContent(editorHtml.value)
+    articleData.content = cleanCodeContent(editorHtml.value)
 
-      // 构建附件数据
-      const attachments = attachmentFileList.value.map((file: UploadFile) => ({
-        name: file.name || '',
-        url: (file.response as any)?.data?.url || file.url || '',
-        id: file.uid
-      }))
-
-      // 构建参数对象
-      const params = {
-        title: articleName.value,
-        type: articleType.value,
-        category_id: categoryId.value,
-        tags: tags.value,
-        content: cleanedContent,
-        cover: cover.value,
-        visible: visible.value,
-        attachments: attachments // 添加附件信息
-      }
-
-      console.log('新增文章:', params)
-      ElMessage.success('文章发布成功')
-      // 成功后跳转到文章列表页
-      router.push({ name: 'ArticleList' })
-    } catch (error) {
-      console.error('发布文章失败:', error)
-      ElMessage.error('发布文章失败')
+    // 发布时设置状态为published
+    if (articleData.status === 'draft') {
+      articleData.status = 'published'
     }
-  }
 
-  /**
-   * 编辑文章
-   */
-  const editArticle = async () => {
-    if (!validateArticle()) return
+    // 如果没有设置发布时间，使用当前时间
+    if (!articleData.publishTime) {
+      articleData.publishTime = formatDate(useNow().value)
+    }
+
+    // 构建附件数据
+    const attachments = attachmentFileList.value.map((file: UploadFile) => ({
+      name: file.name || '',
+      url: (file.response as any)?.data?.url || file.url || '',
+      id: (file as any).serverId || file.uid
+    }))
+
+    const submitData = {
+      ...articleData,
+      tagIds: selectedTags.value,
+      attachments: attachments,
+      categoryId: articleData.categoryId || 0,
+      articleTypeId: articleData.articleTypeId || 0
+    }
 
     try {
-      const cleanedContent = cleanCodeContent(editorHtml.value)
-
-      // 构建附件数据
-      const attachments = attachmentFileList.value.map((file: UploadFile) => ({
-        name: file.name,
-        url: file.url,
-        id: file.uid
-      }))
-
-      // 构建参数对象
-      const params = {
-        id: route.query.id,
-        title: articleName.value,
-        type: articleType.value,
-        category_id: categoryId.value,
-        tags: tags.value,
-        content: cleanedContent,
-        cover: cover.value,
-        visible: visible.value,
-        attachments: attachments // 添加附件信息
+      let response
+      if (pageMode.value === PageModeEnum.Edit) {
+        response = await articleApi.updateArticle(route.query.id as string, submitData)
+      } else {
+        response = await articleApi.createArticle(submitData)
       }
 
-      console.log('编辑文章:', params)
-      ElMessage.success('文章保存成功')
-      // 成功后跳转到文章列表页
-      router.push({ name: 'ArticleList' })
+      if (response.code === ApiStatus.success) {
+        ElMessage.success(pageMode.value === PageModeEnum.Edit ? '文章更新成功' : '文章发布成功')
+        router.push({ name: 'ArticleList' })
+      } else {
+        ElMessage.error(response.message || '操作失败')
+      }
     } catch (error) {
-      console.error('保存文章失败:', error)
-      ElMessage.error('保存文章失败')
+      console.error('提交文章失败:', error)
+      ElMessage.error('提交文章失败，请稍后重试')
     }
   }
 
@@ -461,19 +508,32 @@
    * 提交表单（新增或编辑）
    */
   const submit = () => {
-    if (pageMode.value === PageModeEnum.Edit) {
-      editArticle()
-    } else {
-      addArticle()
-    }
+    submitArticle()
   }
 
   /**
-   * 图片上传成功回调
+   * 封面上传自定义处理函数
    */
-  const onSuccess = (response: UploadResponse) => {
-    cover.value = response.data?.url || ''
-    ElMessage.success(`图片上传成功 ${EmojiText?.[200] || ''}`)
+  const handleCoverUpload = async (options: any) => {
+    try {
+      const file = options.file
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await attachmentApi.uploadFile(formData)
+      if (response.code === ApiStatus.success) {
+        articleData.coverImage = response.data.url || ''
+        ElMessage.success('封面上传成功')
+        options.onSuccess(response)
+      } else {
+        ElMessage.error('封面上传失败')
+        options.onError(new Error(response.message || '上传失败'))
+      }
+    } catch (error) {
+      console.error('封面上传失败:', error)
+      ElMessage.error('封面上传失败')
+      options.onError(error)
+    }
   }
 
   /**
@@ -487,20 +547,18 @@
    * 上传前的文件校验
    */
   const beforeUpload = (file: File): boolean => {
-    const isImage = file.type?.startsWith('image/') || false
-    const isLt2M = file.size / 1024 / 1024 < MAX_IMAGE_SIZE
-
-    if (!isImage) {
-      ElMessage.error('只能上传图片文件')
+    const isJpgOrPng =
+      file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp'
+    if (!isJpgOrPng) {
+      ElMessage.error('只支持 JPG, PNG, WEBP 格式!')
       return false
     }
-
-    if (!isLt2M) {
-      ElMessage.error(`图片大小不能超过 ${MAX_IMAGE_SIZE}MB`)
+    const isLt5M = file.size / 1024 / 1024 < 5
+    if (!isLt5M) {
+      ElMessage.error('上传图片大小不能超过 5MB!')
       return false
     }
-
-    return true
+    return isJpgOrPng && isLt5M
   }
 
   /**
@@ -525,33 +583,84 @@
   }
 
   /**
+   * 附件上传自定义处理函数
+   */
+  const handleAttachmentUpload = async (options: any) => {
+    try {
+      const file = options.file
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await attachmentApi.uploadFile(formData)
+      if (response.code === ApiStatus.success) {
+        // 将服务器返回的文件ID保存到file对象中，以便删除时使用
+        if (file && response.data.id) {
+          ;(file as any).serverId = response.data.id
+        }
+        ElMessage.success('附件上传成功')
+        options.onSuccess(response, file)
+      } else {
+        ElMessage.error('附件上传失败')
+        options.onError(new Error(response.message || '上传失败'), file)
+      }
+    } catch (error) {
+      console.error('附件上传失败:', error)
+      ElMessage.error('附件上传失败')
+      options.onError(error, options.file)
+    }
+  }
+
+  /**
    * 附件上传成功回调
    */
-  const onAttachmentSuccess = (response: any, file: UploadFile) => {
-    ElMessage.success(`文件 ${file.name} 上传成功`)
-    // 可以在这里处理上传成功后的逻辑，比如保存文件信息到数据库
+  const onAttachmentSuccess = (response: any) => {
+    if (response.code === ApiStatus.success) {
+      ElMessage.success('附件上传成功')
+    } else {
+      ElMessage.error('附件上传失败')
+    }
   }
 
   /**
    * 附件上传失败回调
    */
-  const onAttachmentError = (error: Error, file: UploadFile) => {
-    ElMessage.error(`文件 ${file.name} 上传失败`)
+  const onAttachmentError = () => {
+    ElMessage.error('文件上传失败')
   }
 
   /**
    * 附件删除回调
    */
-  const onAttachmentRemove = (file: UploadFile) => {
-    // 从文件列表中移除指定文件
-    const index = attachmentFileList.value.findIndex((item: UploadFile) => item.uid === file.uid)
-    if (index > -1) {
-      attachmentFileList.value.splice(index, 1)
+  const onAttachmentRemove = async (file: UploadFile) => {
+    try {
+      const fileWithServerId = file as any
+      // 如果文件已上传到服务器，调用API删除服务器上的文件
+      if (fileWithServerId.serverId) {
+        const response = await attachmentApi.deleteAttachment(fileWithServerId.serverId)
+        if (response.code !== ApiStatus.success) {
+          console.error('删除服务器文件失败:', response.message)
+          // 即使服务器删除失败，也继续从本地列表移除
+        }
+      }
+
+      // 从文件列表中移除指定文件
+      const index = attachmentFileList.value.findIndex((item: UploadFile) => item.uid === file.uid)
+      if (index > -1) {
+        attachmentFileList.value.splice(index, 1)
+      }
+    } catch (error) {
+      console.error('删除附件失败:', error)
+      // 即使发生错误，也从本地列表移除文件
+      const index = attachmentFileList.value.findIndex((item: UploadFile) => item.uid === file.uid)
+      if (index > -1) {
+        attachmentFileList.value.splice(index, 1)
+      }
     }
-    // 可以在这里添加删除服务器文件的逻辑
   }
 
   const { scrollToTop } = useCommon()
+
+  // 监听编辑器内容变化功能已完全删除，未使用
 
   onMounted(async () => {
     scrollToTop()

@@ -60,8 +60,28 @@
         <el-form-item label="标签名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入标签名称" />
         </el-form-item>
-        <el-form-item label="标签排序" prop="sort">
-          <el-input-number v-model="formData.sort" :min="0" :max="999" placeholder="请输入排序号" />
+        <el-form-item label="标签排序" prop="sortOrder">
+          <el-input-number
+            v-model="formData.sortOrder"
+            :min="0"
+            :max="999"
+            placeholder="请输入排序号"
+          />
+        </el-form-item>
+        <el-form-item label="文字颜色" prop="color">
+          <el-input v-model="formData.color" placeholder="请输入文字颜色（如：#303133）" />
+        </el-form-item>
+        <el-form-item label="背景颜色" prop="backgroundColor">
+          <el-input
+            v-model="formData.backgroundColor"
+            placeholder="请输入背景颜色（如：#F5F7FA）"
+          />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="formData.status">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">禁用</el-radio>
+          </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -87,9 +107,14 @@
   interface Tag {
     id: number
     name: string
-    sort: number
-    article_count: number
-    create_time: string
+    color: string
+    backgroundColor: string
+    sortOrder: number
+    status: number
+    usageCount: number
+    createBy: number
+    createTime: string
+    updateTime: string
   }
 
   // 响应式数据
@@ -106,9 +131,14 @@
   const formData = reactive({
     id: 0,
     name: '',
-    sort: 0,
-    article_count: 0,
-    create_time: ''
+    color: '#303133',
+    backgroundColor: '#F5F7FA',
+    sortOrder: 0,
+    status: 1,
+    usageCount: 0,
+    createBy: 0,
+    createTime: '',
+    updateTime: ''
   })
 
   // 表格数据和分页
@@ -125,13 +155,29 @@
       { required: true, message: '请输入标签名称', trigger: 'blur' },
       { min: 1, max: 20, message: '标签名称长度在 1 到 20 个字符', trigger: 'blur' }
     ],
-    sort: [
+    sortOrder: [
       { required: true, message: '请输入排序号', trigger: 'blur' },
       {
         type: 'number' as const,
         min: 0,
         max: 999,
         message: '排序号必须在 0-999 之间',
+        trigger: 'blur'
+      }
+    ],
+    color: [
+      { required: true, message: '请输入文字颜色', trigger: 'blur' },
+      {
+        pattern: /^#[0-9A-Fa-f]{6}$/,
+        message: '颜色格式不正确，请输入类似 #303133 的格式',
+        trigger: 'blur'
+      }
+    ],
+    backgroundColor: [
+      { required: true, message: '请输入背景颜色', trigger: 'blur' },
+      {
+        pattern: /^#[0-9A-Fa-f]{6}$/,
+        message: '颜色格式不正确，请输入类似 #F5F7FA 的格式',
         trigger: 'blur'
       }
     ]
@@ -151,51 +197,86 @@
           {
             id: 1,
             name: 'Vue',
-            sort: 1,
-            article_count: 12,
-            create_time: '2024-01-01 10:00:00'
+            color: '#42b883',
+            backgroundColor: '#e6f7ff',
+            sortOrder: 1,
+            status: 1,
+            usageCount: 12,
+            createBy: 1,
+            createTime: '2024-01-01 10:00:00',
+            updateTime: '2024-01-01 10:00:00'
           },
           {
             id: 2,
             name: 'React',
-            sort: 2,
-            article_count: 8,
-            create_time: '2024-01-01 11:00:00'
+            color: '#61dafb',
+            backgroundColor: '#f0f9ff',
+            sortOrder: 2,
+            status: 1,
+            usageCount: 8,
+            createBy: 1,
+            createTime: '2024-01-01 11:00:00',
+            updateTime: '2024-01-01 11:00:00'
           },
           {
             id: 3,
             name: 'TypeScript',
-            sort: 3,
-            article_count: 15,
-            create_time: '2024-01-01 12:00:00'
+            color: '#3178c6',
+            backgroundColor: '#ecf5ff',
+            sortOrder: 3,
+            status: 1,
+            usageCount: 15,
+            createBy: 1,
+            createTime: '2024-01-01 12:00:00',
+            updateTime: '2024-01-01 12:00:00'
           },
           {
             id: 4,
             name: 'Node.js',
-            sort: 4,
-            article_count: 10,
-            create_time: '2024-01-01 13:00:00'
+            color: '#68a063',
+            backgroundColor: '#f0f9ff',
+            sortOrder: 4,
+            status: 1,
+            usageCount: 10,
+            createBy: 1,
+            createTime: '2024-01-01 13:00:00',
+            updateTime: '2024-01-01 13:00:00'
           },
           {
             id: 5,
             name: 'Webpack',
-            sort: 5,
-            article_count: 6,
-            create_time: '2024-01-01 14:00:00'
+            color: '#8dd6f9',
+            backgroundColor: '#f0f8ff',
+            sortOrder: 5,
+            status: 1,
+            usageCount: 6,
+            createBy: 1,
+            createTime: '2024-01-01 14:00:00',
+            updateTime: '2024-01-01 14:00:00'
           },
           {
             id: 6,
             name: 'CSS3',
-            sort: 6,
-            article_count: 9,
-            create_time: '2024-01-01 15:00:00'
+            color: '#1572b6',
+            backgroundColor: '#f0f9ff',
+            sortOrder: 6,
+            status: 1,
+            usageCount: 9,
+            createBy: 1,
+            createTime: '2024-01-01 15:00:00',
+            updateTime: '2024-01-01 15:00:00'
           },
           {
             id: 7,
             name: 'JavaScript',
-            sort: 7,
-            article_count: 20,
-            create_time: '2024-01-01 16:00:00'
+            color: '#f7df1e',
+            backgroundColor: '#fffbe6',
+            sortOrder: 7,
+            status: 0,
+            usageCount: 20,
+            createBy: 1,
+            createTime: '2024-01-01 16:00:00',
+            updateTime: '2024-01-01 16:00:00'
           }
         ]
         resolve(mockTags)
@@ -209,31 +290,121 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center'
+      align: 'center',
+      fixed: 'left'
     },
     {
       prop: 'name',
       label: '标签名称',
-      width: 180
+      width: 180,
+      formatter: (row: Tag) => {
+        return h(
+          'span',
+          {
+            style: {
+              color: row.color,
+              backgroundColor: row.backgroundColor,
+              padding: '2px 8px',
+              borderRadius: '4px',
+              display: 'inline-block'
+            }
+          },
+          row.name
+        )
+      }
     },
     {
-      prop: 'sort',
+      prop: 'color',
+      label: '文字颜色',
+      width: 120,
+      formatter: (row: Tag) => {
+        return h(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }
+          },
+          [
+            h('span', row.color),
+            h('span', {
+              style: {
+                backgroundColor: row.color,
+                width: '20px',
+                height: '20px',
+                borderRadius: '4px',
+                border: '1px solid #dcdfe6'
+              }
+            })
+          ]
+        )
+      }
+    },
+    {
+      prop: 'backgroundColor',
+      label: '背景颜色',
+      width: 120,
+      formatter: (row: Tag) => {
+        return h(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }
+          },
+          [
+            h('span', row.backgroundColor),
+            h('span', {
+              style: {
+                backgroundColor: row.backgroundColor,
+                width: '20px',
+                height: '20px',
+                borderRadius: '4px',
+                border: '1px solid #dcdfe6'
+              }
+            })
+          ]
+        )
+      }
+    },
+    {
+      prop: 'sortOrder',
       label: '排序号',
       width: 100,
       align: 'center'
     },
     {
-      prop: 'article_count',
+      prop: 'status',
+      label: '状态',
+      width: 100,
+      align: 'center',
+      formatter: (row: Tag) => {
+        return h(
+          'el-tag',
+          {
+            type: row.status === 1 ? 'success' : 'danger',
+            size: 'small'
+          },
+          row.status === 1 ? '启用' : '禁用'
+        )
+      }
+    },
+    {
+      prop: 'usageCount',
       label: '文章数量',
       width: 120,
       align: 'center'
     },
     {
-      prop: 'create_time',
+      prop: 'createTime',
       label: '创建时间',
       width: 200,
       formatter: (row: Tag) => {
-        return h('p', {}, formatDate(row.create_time))
+        return h('p', {}, formatDate(row.createTime))
       }
     },
     {
@@ -241,6 +412,7 @@
       label: '操作',
       width: 180,
       align: 'right',
+      fixed: 'right',
       formatter: (row: Tag) => {
         const buttonStyle = { style: 'text-align: right' }
 
@@ -339,7 +511,16 @@
     isEditMode.value = true
     showDialog.value = true
     // 填充表单数据
-    Object.assign(formData, tag)
+    formData.id = tag.id
+    formData.name = tag.name
+    formData.color = tag.color
+    formData.backgroundColor = tag.backgroundColor
+    formData.sortOrder = tag.sortOrder
+    formData.status = tag.status
+    formData.usageCount = tag.usageCount
+    formData.createBy = tag.createBy
+    formData.createTime = tag.createTime
+    formData.updateTime = tag.updateTime
   }
 
   const handleDelete = async (tag: Tag) => {

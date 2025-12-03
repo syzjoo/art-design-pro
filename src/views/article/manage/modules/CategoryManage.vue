@@ -60,8 +60,37 @@
         <el-form-item label="分类名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入分类名称" />
         </el-form-item>
-        <el-form-item label="分类排序" prop="sort">
-          <el-input-number v-model="formData.sort" :min="0" :max="999" placeholder="请输入排序号" />
+        <el-form-item label="分类排序" prop="sortOrder">
+          <el-input-number
+            v-model="formData.sortOrder"
+            :min="0"
+            :max="999"
+            placeholder="请输入排序号"
+          />
+        </el-form-item>
+        <el-form-item label="父分类" prop="parentId">
+          <el-select v-model="formData.parentId" placeholder="请选择父分类" style="width: 100%">
+            <el-option label="顶级分类" :value="0" />
+            <el-option label="前端开发" :value="1" />
+            <el-option label="后端开发" :value="2" />
+            <el-option label="数据库" :value="3" />
+            <el-option label="算法" :value="4" />
+            <el-option label="人工智能" :value="5" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="分类描述" prop="description">
+          <el-input
+            v-model="formData.description"
+            placeholder="请输入分类描述"
+            type="textarea"
+            :rows="2"
+          />
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="formData.status">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">禁用</el-radio>
+          </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -87,9 +116,15 @@
   interface Category {
     id: number
     name: string
-    sort: number
-    article_count: number
-    create_time: string
+    parentId: number
+    description: string
+    articleCount: number
+    status: number
+    sortOrder: number
+    createBy: number
+    updateBy: number
+    createTime: string
+    updateTime: string
   }
 
   // 响应式数据
@@ -106,9 +141,15 @@
   const formData = reactive({
     id: 0,
     name: '',
-    sort: 0,
-    article_count: 0,
-    create_time: ''
+    parentId: 0,
+    description: '',
+    status: 1,
+    sortOrder: 0,
+    articleCount: 0,
+    createBy: 0,
+    updateBy: 0,
+    createTime: '',
+    updateTime: ''
   })
 
   // 表格数据和分页
@@ -125,7 +166,7 @@
       { required: true, message: '请输入分类名称', trigger: 'blur' },
       { min: 1, max: 20, message: '分类名称长度在 1 到 20 个字符', trigger: 'blur' }
     ],
-    sort: [
+    sortOrder: [
       { required: true, message: '请输入排序号', trigger: 'blur' },
       {
         type: 'number' as const,
@@ -134,7 +175,8 @@
         message: '排序号必须在 0-999 之间',
         trigger: 'blur'
       }
-    ]
+    ],
+    description: [{ max: 200, message: '分类描述长度不能超过 200 个字符', trigger: 'blur' }]
   }
 
   // 格式化日期
@@ -151,37 +193,93 @@
           {
             id: 1,
             name: '前端开发',
-            sort: 1,
-            article_count: 20,
-            create_time: '2024-01-01 10:00:00'
+            parentId: 0,
+            description: '前端开发相关技术文章',
+            articleCount: 20,
+            status: 1,
+            sortOrder: 1,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 10:00:00',
+            updateTime: '2024-01-01 10:00:00'
           },
           {
             id: 2,
             name: '后端开发',
-            sort: 2,
-            article_count: 15,
-            create_time: '2024-01-01 11:00:00'
+            parentId: 0,
+            description: '后端开发相关技术文章',
+            articleCount: 15,
+            status: 1,
+            sortOrder: 2,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 11:00:00',
+            updateTime: '2024-01-01 11:00:00'
           },
           {
             id: 3,
             name: '数据库',
-            sort: 3,
-            article_count: 8,
-            create_time: '2024-01-01 12:00:00'
+            parentId: 0,
+            description: '数据库相关技术文章',
+            articleCount: 8,
+            status: 1,
+            sortOrder: 3,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 12:00:00',
+            updateTime: '2024-01-01 12:00:00'
           },
           {
             id: 4,
             name: '算法',
-            sort: 4,
-            article_count: 12,
-            create_time: '2024-01-01 13:00:00'
+            parentId: 0,
+            description: '算法与数据结构相关文章',
+            articleCount: 12,
+            status: 1,
+            sortOrder: 4,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 13:00:00',
+            updateTime: '2024-01-01 13:00:00'
           },
           {
             id: 5,
             name: '人工智能',
-            sort: 5,
-            article_count: 6,
-            create_time: '2024-01-01 14:00:00'
+            parentId: 0,
+            description: '人工智能相关技术文章',
+            articleCount: 6,
+            status: 1,
+            sortOrder: 5,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-01 14:00:00',
+            updateTime: '2024-01-01 14:00:00'
+          },
+          {
+            id: 6,
+            name: 'Vue.js',
+            parentId: 1,
+            description: 'Vue.js框架相关文章',
+            articleCount: 8,
+            status: 1,
+            sortOrder: 1,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-02 10:00:00',
+            updateTime: '2024-01-02 10:00:00'
+          },
+          {
+            id: 7,
+            name: 'React',
+            parentId: 1,
+            description: 'React框架相关文章',
+            articleCount: 6,
+            status: 0,
+            sortOrder: 2,
+            createBy: 1,
+            updateBy: 1,
+            createTime: '2024-01-02 11:00:00',
+            updateTime: '2024-01-02 11:00:00'
           }
         ]
         resolve(mockCategories)
@@ -195,31 +293,67 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center'
+      align: 'center',
+      fixed: 'left'
     },
     {
       prop: 'name',
       label: '分类名称',
-      width: 180
+      width: 180,
+      formatter: (row: Category) => {
+        // 为子分类添加缩进
+        const indent = row.parentId > 0 ? '└─ ' : ''
+        return h('span', null, indent + row.name)
+      }
     },
     {
-      prop: 'sort',
+      prop: 'parentId',
+      label: '父分类',
+      width: 120,
+      align: 'center',
+      formatter: (row: Category) => {
+        return h('span', null, row.parentId === 0 ? '顶级分类' : row.parentId.toString())
+      }
+    },
+    {
+      prop: 'description',
+      label: '分类描述',
+      width: 250
+    },
+    {
+      prop: 'sortOrder',
       label: '排序号',
       width: 100,
       align: 'center'
     },
     {
-      prop: 'article_count',
+      prop: 'status',
+      label: '状态',
+      width: 100,
+      align: 'center',
+      formatter: (row: Category) => {
+        return h(
+          'el-tag',
+          {
+            type: row.status === 1 ? 'success' : 'danger',
+            size: 'small'
+          },
+          row.status === 1 ? '启用' : '禁用'
+        )
+      }
+    },
+    {
+      prop: 'articleCount',
       label: '文章数量',
       width: 120,
       align: 'center'
     },
     {
-      prop: 'create_time',
+      prop: 'createTime',
       label: '创建时间',
       width: 200,
       formatter: (row: Category) => {
-        return h('p', {}, formatDate(row.create_time))
+        return h('p', {}, formatDate(row.createTime))
       }
     },
     {
@@ -227,6 +361,7 @@
       label: '操作',
       width: 180,
       align: 'right',
+      fixed: 'right',
       formatter: (row: Category) => {
         const buttonStyle = { style: 'text-align: right' }
 
@@ -325,7 +460,17 @@
     isEditMode.value = true
     showDialog.value = true
     // 填充表单数据
-    Object.assign(formData, category)
+    formData.id = category.id
+    formData.name = category.name
+    formData.parentId = category.parentId
+    formData.description = category.description
+    formData.status = category.status
+    formData.sortOrder = category.sortOrder
+    formData.articleCount = category.articleCount
+    formData.createBy = category.createBy
+    formData.updateBy = category.updateBy
+    formData.createTime = category.createTime
+    formData.updateTime = category.updateTime
   }
 
   const handleDelete = async (category: Category) => {

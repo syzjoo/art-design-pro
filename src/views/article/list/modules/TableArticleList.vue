@@ -8,7 +8,7 @@
       :data="tableData"
       :stripe="false"
       height="500"
-      style="overflow-y: auto"
+      :style="{ overflowY: 'auto' }"
     />
     <!-- <div style="display: flex; justify-content: center; margin-top: 20px">
       <el-pagination
@@ -41,12 +41,46 @@
           >
           </el-image>
 
-          <span class="absolute top-1 right-1 bg-black/50 rounded text-xs px-1 py-0.5 text-white">{{
-            item.type_name
-          }}</span>
+          <div class="absolute top-1 right-1 flex flex-col items-end gap-1">
+            <span class="bg-black/50 rounded text-xs px-1 py-0.5 text-white">{{
+              item.type_name
+            }}</span>
+            <span
+              v-if="item.top === 1"
+              class="bg-warning/80 rounded text-xs px-1 py-0.5 text-white"
+            >
+              置顶
+            </span>
+            <span v-if="item.hot === 1" class="bg-danger/80 rounded text-xs px-1 py-0.5 text-white">
+              热门
+            </span>
+          </div>
+
+          <span
+            v-if="item.category_name"
+            class="absolute bottom-1 left-1 bg-black/50 rounded text-xs px-1 py-0.5 text-white"
+          >
+            {{ item.category_name }}
+          </span>
         </div>
         <div class="px-2 py-1">
           <h2 class="text-base text-g-800 font-medium">{{ item.title }}</h2>
+
+          <!-- 标签显示 -->
+          <div v-if="item.tags && item.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+            <el-tag
+              v-for="(tag, index) in item.tags.slice(0, 3)"
+              :key="tag.id"
+              size="small"
+              :type="['success', 'warning', 'info', 'danger', 'primary'][index % 5] as any"
+            >
+              {{ tag.name }}
+            </el-tag>
+            <el-tag v-if="item.tags.length > 3" size="small" :type="'primary' as any">
+              +{{ item.tags.length - 3 }}
+            </el-tag>
+          </div>
+
           <div class="flex-b w-full h-6 mt-1">
             <div class="flex-c text-g-500">
               <span class="text-sm">{{ useDateFormat(item.create_time, 'YYYY-MM-DD') }}</span>
@@ -57,7 +91,7 @@
               class="opacity-0 group-hover:opacity-100"
               size="small"
               @click.stop="toEdit(item)"
-              type="primary"
+              :type="'primary' as any"
             >
               编辑
             </el-button>
@@ -78,9 +112,9 @@
       @current-change="handleCurrentChange"
     />
   </div>
-  <div style="margin-top: 16vh" v-if="!tableData.length && !loading">
+  <!-- <div style="margin-top: 16vh" v-if="!tableData.length && !loading">
     <el-empty description="未找到相关数据" />
-  </div>
+  </div> -->
 </template>
 
 <script setup lang="ts">
@@ -100,6 +134,8 @@
       category_id: number | null
       tag_id: number | null
       status: number | null
+      top?: number | null
+      hot?: number | null
     }
     loading?: boolean
   }>()
@@ -116,11 +152,15 @@
     id: number
     home_img: string
     type_name: string
+    category_name?: string
     title: string
     create_time: string
     count: number
     author_name?: string
     status: number
+    top: number
+    hot: number
+    tags?: Array<{ id: number; name: string }>
   }
 
   // 表格数据和分页
@@ -138,31 +178,72 @@
       total: number
     }>((resolve) => {
       setTimeout(() => {
-        const { searchVal, category_id, status } = props.searchParams // 不使用tag_id参数
+        const {
+          searchVal: keyword = '',
+          category_id = null,
+          tag_id = null,
+          status = null,
+          top = null,
+          hot = null
+        } = props.searchParams || {}
 
         // 模拟数据过滤
-        let filteredItems = Array.from({ length: 100 }, (_, i) => ({
-          id: i + 1,
-          home_img: `https://picsum.photos/400/250?random=${i}`,
-          type_name: `分类${(i % 3) + 1}`,
-          title: `文章标题${i + 1} - ${searchVal || '全部文章'}`,
-          create_time: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
-          count: Math.floor(Math.random() * 1000) + 1,
-          status: Math.floor(Math.random() * 2) + 1
-        }))
+        // 标签数据
+        const tagOptions = [
+          'Vue',
+          'React',
+          'TypeScript',
+          'Node.js',
+          'CSS',
+          'JavaScript',
+          'HTML',
+          'Python'
+        ]
+
+        let dataSource = Array.from({ length: 100 }, (_, i) => {
+          // 随机选择1-3个标签
+          const tagCount = Math.floor(Math.random() * 3) + 1
+          const selectedTags: { id: number; name: string }[] = []
+          for (let j = 0; j < tagCount; j++) {
+            const tagIndex = Math.floor(Math.random() * tagOptions.length)
+            selectedTags.push({
+              id: tagIndex + 1,
+              name: tagOptions[tagIndex]
+            })
+          }
+
+          // 为前15篇文章随机设置置顶或热门，增加测试数据的多样性
+          const isTopCandidate = i < 10
+          const isHotCandidate = i < 15
+          return {
+            id: i + 1,
+            home_img: `https://picsum.photos/400/250?random=${i}`,
+            type_name: `文章类型${(i % 3) + 1}`,
+            category_name: `文章分类${(i % 3) + 1}`,
+            title: `文章标题${i + 1} - ${keyword || '全部文章'}`,
+            create_time: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
+            count: Math.floor(Math.random() * 1000) + 1,
+            status: Math.floor(Math.random() * 2) + 1,
+            top: isTopCandidate ? Math.floor(Math.random() * 2) : 0,
+            hot: isHotCandidate ? Math.floor(Math.random() * 2) : 0,
+            tags: selectedTags
+          }
+        })
 
         // 应用搜索过滤
-        if (searchVal) {
-          filteredItems = filteredItems.filter((item) =>
-            item.title.toLowerCase().includes(searchVal.toLowerCase())
-          )
-        }
-        if (category_id) {
-          filteredItems = filteredItems.filter((item) => item.type_name === `分类${category_id}`)
-        }
-        if (status) {
-          filteredItems = filteredItems.filter((item) => item.status === status)
-        }
+        const filteredItems = dataSource.filter((item: Article) => {
+          const matchKeyword = !keyword || item.title.includes(keyword)
+          const matchCategory =
+            category_id === null ||
+            !category_id ||
+            item.category_name?.includes(`文章分类${category_id}`)
+          const matchTag =
+            tag_id === null || !tag_id || (item.tags && item.tags.some((tag) => tag.id === tag_id))
+          const matchStatus = status === null || !status || item.status === status
+          const matchTop = top === null || !top || (top === 1 ? item.top === 1 : item.top === 0)
+          const matchHot = hot === null || !hot || (hot === 1 ? item.hot === 1 : item.hot === 0)
+          return matchKeyword && matchCategory && matchTag && matchStatus && matchTop && matchHot
+        })
 
         // 分页
         const start = (pagination.current - 1) * pagination.size
@@ -183,33 +264,87 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center'
+      align: 'center',
+      isFixed: true
     },
     {
       prop: 'title',
       label: '文章标题',
-      minWidth: 300,
+      minWidth: 350,
       formatter: (row: Article) => {
-        return h(
-          'a',
-          {
-            href: '#',
-            style: { color: '#409eff', cursor: 'pointer' },
-            onClick: (e: Event) => {
-              e.preventDefault()
-              toDetail(row)
-            }
-          },
-          row.title
+        const elements: any[] = []
+        // 先添加置顶标签
+        if (row.top === 1) {
+          elements.push(
+            h(
+              ElTag,
+              { type: 'warning' as any, size: 'small', style: { marginRight: '4px' } },
+              () => '置顶'
+            )
+          )
+        }
+        // 添加热门标签
+        if (row.hot === 1) {
+          elements.push(
+            h(
+              ElTag,
+              { type: 'danger' as any, size: 'small', style: { marginRight: '4px' } },
+              () => '热门'
+            )
+          )
+        }
+        // 在标签后面添加标题链接
+        elements.push(
+          h(
+            'a',
+            {
+              href: '#',
+              style: { color: '#409eff', cursor: 'pointer' },
+              onClick: (e: Event) => {
+                e.preventDefault()
+                toDetail(row)
+              }
+            },
+            row.title
+          )
         )
+        return h('div', { style: { display: 'flex', alignItems: 'center' } }, elements)
+      }
+    },
+    {
+      prop: 'category_name',
+      label: '文章分类',
+      width: 120,
+      formatter: (row: Article) => {
+        return h(ElTag, { type: 'primary' as any }, () => row.category_name || '未分类')
       }
     },
     {
       prop: 'type_name',
-      label: '文章分类',
+      label: '文章类型',
       width: 120,
       formatter: (row: Article) => {
-        return h(ElTag, { type: 'primary' }, () => row.type_name)
+        return h(ElTag, { type: 'info' as any }, () => row.type_name || '普通文章')
+      }
+    },
+    {
+      prop: 'tags',
+      label: '文章标签',
+      minWidth: 200,
+      formatter: (row: Article) => {
+        if (!row.tags || row.tags.length === 0) {
+          return h(ElTag, { type: 'primary' as any }, () => '无标签')
+        }
+
+        const colors = ['success', 'warning', 'info', 'danger', 'primary']
+        return h(
+          'div',
+          { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+          row.tags.map((tag, index) => {
+            const colorIndex = index % colors.length
+            return h(ElTag, { type: colors[colorIndex] as any, size: 'small' }, () => tag.name)
+          })
+        )
       }
     },
     {
@@ -242,24 +377,52 @@
     {
       prop: 'operation',
       label: '操作',
-      width: 180,
+      width: 280,
       align: 'right',
+      isFixed: 'right',
       formatter: (row: Article) => {
         const buttonStyle = { style: 'text-align: right' }
-
         return h('div', buttonStyle, [
-          h(ArtButtonTable, {
-            type: 'view',
-            onClick: () => toDetail(row)
-          }),
-          h(ArtButtonTable, {
-            type: 'edit',
-            onClick: () => toEdit(row)
-          }),
-          h(ArtButtonTable, {
-            type: 'delete',
-            onClick: () => deleteArticle(row)
-          })
+          h(
+            ArtButtonTable,
+            {
+              type: 'view' as any,
+              onClick: () => toDetail(row)
+            },
+            '查看'
+          ),
+          h(
+            ArtButtonTable,
+            {
+              type: 'edit' as any,
+              onClick: () => toEdit(row)
+            },
+            '编辑'
+          ),
+          h(
+            ArtButtonTable,
+            {
+              type: (row.top === 1 ? 'notTop' : 'top') as any,
+              onClick: () => handleTop(row)
+            },
+            row.top === 1 ? '取消置顶' : '置顶'
+          ),
+          h(
+            ArtButtonTable,
+            {
+              type: (row.hot === 1 ? 'notHot' : 'hot') as any,
+              onClick: () => handleHot(row)
+            },
+            row.hot === 1 ? '取消热门' : '热门'
+          ),
+          h(
+            ArtButtonTable,
+            {
+              type: 'delete' as any,
+              onClick: () => deleteArticle(row)
+            },
+            '删除'
+          )
         ])
       }
     }
@@ -280,6 +443,44 @@
   // 跳转到编辑页面
   const toEdit = (row: Article) => {
     router.push({ name: 'ArticlePublish', query: { id: row.id.toString() } })
+  }
+
+  // 处理置顶状态切换
+  const handleTop = (row: Article) => {
+    const newTopStatus = row.top === 1 ? 0 : 1
+    const title = newTopStatus === 1 ? '置顶' : '取消置顶'
+    ElMessageBox.confirm(`确定要${title}此文章吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      // 更新当前表格数据
+      const tableItem = tableData.value.find((item: Article) => item.id === row.id)
+      if (tableItem) {
+        tableItem.top = newTopStatus
+      }
+      ElMessage.success(`${title}成功`)
+      emit('refresh')
+    })
+  }
+
+  // 处理热门状态切换
+  const handleHot = (row: Article) => {
+    const newHotStatus = row.hot === 1 ? 0 : 1
+    const title = newHotStatus === 1 ? '设为热门' : '取消热门'
+    ElMessageBox.confirm(`确定要${title}此文章吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      // 更新当前表格数据
+      const tableItem = tableData.value.find((item: Article) => item.id === row.id)
+      if (tableItem) {
+        tableItem.hot = newHotStatus
+      }
+      ElMessage.success(`${title}成功`)
+      emit('refresh')
+    })
   }
 
   // 删除文章
