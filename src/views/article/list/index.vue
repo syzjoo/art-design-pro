@@ -1,6 +1,6 @@
 <!-- 文章列表页面 -->
 <template>
-  <div class="article-page art-full-height">
+  <div class="article-page art-full-height flex flex-col">
     <!-- 搜索栏 -->
     <ArtSearchBar
       v-model="formFilters"
@@ -8,9 +8,10 @@
       :showExpand="false"
       @reset="handleReset"
       @search="handleSearch"
+      class="search-bar"
     />
 
-    <ElCard class="art-table-card" shadow="never">
+    <ElCard class="art-table-card flex-1" shadow="never">
       <!-- 表格头部 -->
       <ArtTableHeader
         :showZebra="false"
@@ -283,4 +284,9 @@
   // }
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+  .search-bar {
+    flex-shrink: 0;
+    height: 70px; // 固定搜索栏高度
+  }
+</style>

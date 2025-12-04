@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full" v-if="listType === 'list'">
+  <div class="w-full flex flex-col h-full" v-if="listType === 'list'">
     <ArtTable
       ref="tableRef"
       rowKey="id"
@@ -7,22 +7,14 @@
       :columns="columns"
       :data="tableData"
       :stripe="false"
-      height="500"
-      :style="{ overflowY: 'auto' }"
+      :height="tableHeight"
     />
-    <!-- <div style="display: flex; justify-content: center; margin-top: 20px">
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="pagination.total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div> -->
   </div>
-  <div class="mt-5" v-else-if="listType === 'card'" style="height: 500px; overflow-y: auto">
+  <div
+    class="w-full flex flex-col"
+    v-else-if="listType === 'card'"
+    style="max-height: calc(100vh - 250px); overflow-y: auto"
+  >
     <div
       class="grid grid-cols-5 gap-5 max-2xl:grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1"
     >
@@ -101,7 +93,6 @@
     </div>
   </div>
   <div style="display: flex; justify-content: center; margin-top: 20px">
-    <!-- //:page-sizes="[10, 20, 50, 100]" -->
     <el-pagination
       v-model:current-page="pagination.current"
       v-model:page-size="pagination.size"
@@ -118,12 +109,13 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, watch, h } from 'vue'
+  import { ref, reactive, watch, h, computed } from 'vue'
   import { ElMessageBox, ElMessage, ElTag } from 'element-plus'
   import { useRouter } from 'vue-router'
   import { useDateFormat } from '@vueuse/core'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { useTableHeight } from '@/hooks/core/useTableHeight'
 
   // Props定义
   const props = defineProps<{
@@ -169,6 +161,25 @@
     current: 1,
     size: 10,
     total: 0
+  })
+
+  // 表格高度计算
+  const { containerHeight } = useTableHeight({
+    showTableHeader: ref(true),
+    paginationHeight: ref(60),
+    tableHeaderHeight: ref(44),
+    paginationSpacing: ref(12)
+  })
+
+  // 计算表格高度（使用useTableHeight返回的containerHeight并减去搜索栏高度、margin和padding）
+  const tableHeight = computed(() => {
+    // 搜索栏高度约为70px
+    const searchBarHeight = 70
+    // 额外的margin和padding值（增加分页器高度和间距）
+    const additionalSpacing = 100 // 包括容器的margin、padding和分页器高度等
+    return containerHeight
+      ? `calc(${containerHeight}px - ${searchBarHeight + additionalSpacing}px)`
+      : '100%'
   })
 
   // 模拟数据获取API函数
@@ -379,7 +390,7 @@
       label: '操作',
       width: 280,
       align: 'right',
-      isFixed: 'right',
+      fixed: 'right',
       formatter: (row: Article) => {
         const buttonStyle = { style: 'text-align: right' }
         return h('div', buttonStyle, [

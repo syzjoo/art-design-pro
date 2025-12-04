@@ -34,7 +34,6 @@
         :columns="columns"
         :data="tableData"
         :stripe="false"
-        style="overflow-y: auto"
       />
       <div style="display: flex; justify-content: center; margin-top: 10px">
         <el-pagination
@@ -56,15 +55,26 @@
       width="500px"
       @close="handleDialogClose"
     >
-      <el-form :model="formData" :rules="rules" ref="formRef">
+      <el-form
+        :model="formData"
+        :rules="rules"
+        ref="formRef"
+        label-width="100px"
+        label-position="right"
+        style="max-width: 450px; margin: 0 auto"
+      >
         <el-form-item label="类型名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入类型名称" />
+          <el-input v-model="formData.name" placeholder="请输入类型名称" style="width: 100%" />
         </el-form-item>
         <el-form-item label="类型编码" prop="code">
-          <el-input v-model="formData.code" placeholder="请输入类型编码（英文/数字）" />
+          <el-input
+            v-model="formData.code"
+            placeholder="请输入类型编码（英文/数字）"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="类型图标" prop="icon">
-          <el-input v-model="formData.icon" placeholder="请输入图标名称" />
+          <el-input v-model="formData.icon" placeholder="请输入图标名称" style="width: 100%" />
         </el-form-item>
         <el-form-item label="类型状态" prop="status">
           <el-switch
@@ -73,6 +83,7 @@
             :inactive-value="0"
             active-text="启用"
             inactive-text="禁用"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="类型描述" prop="description">
@@ -81,6 +92,7 @@
             type="textarea"
             :rows="3"
             placeholder="请输入类型描述（可选）"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="类型排序" prop="sortOrder">
@@ -89,6 +101,7 @@
             :min="0"
             :max="999"
             placeholder="请输入排序号"
+            style="width: 100%"
           />
         </el-form-item>
       </el-form>
@@ -107,24 +120,13 @@
   import ArtTable from '@/components/core/tables/art-table/index.vue'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { articleTypeApi } from '@/api/article'
 
   // 定义事件
   const emit = defineEmits(['refresh'])
 
-  // 定义类型接口
-  interface ArticleType {
-    id: number
-    name: string
-    code: string
-    description: string
-    icon: string
-    status: number
-    sortOrder: number
-    createBy: number
-    updateBy: number
-    createTime: string
-    updateTime: string
-  }
+  // 导入类型
+  import type { ArticleType } from '@/types/api/article'
 
   // 响应式数据
   const searchForm = reactive({
@@ -145,8 +147,6 @@
     icon: 'document',
     status: 1,
     sortOrder: 0,
-    createBy: 0,
-    updateBy: 0,
     createTime: '',
     updateTime: ''
   })
@@ -183,85 +183,9 @@
   }
 
   // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN')
-  }
-
-  // 模拟获取所有文章类型
-  const fetchAllTypes = async () => {
-    return new Promise<ArticleType[]>((resolve) => {
-      setTimeout(() => {
-        const mockTypes = [
-          {
-            id: 1,
-            name: '技术文章',
-            code: 'TECHNICAL',
-            description: '分享技术经验和开发技巧的文章',
-            icon: 'document',
-            status: 1,
-            sortOrder: 1,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 10:00:00',
-            updateTime: '2024-01-01 10:00:00'
-          },
-          {
-            id: 2,
-            name: '教程',
-            code: 'TUTORIAL',
-            description: '详细的技术教程和学习指南',
-            icon: 'school',
-            status: 1,
-            sortOrder: 2,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 11:00:00',
-            updateTime: '2024-01-01 11:00:00'
-          },
-          {
-            id: 3,
-            name: '博客',
-            code: 'BLOG',
-            description: '个人观点和经验分享',
-            icon: 'edit',
-            status: 1,
-            sortOrder: 3,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 12:00:00',
-            updateTime: '2024-01-01 12:00:00'
-          },
-          {
-            id: 4,
-            name: '新闻',
-            code: 'NEWS',
-            description: '技术资讯和行业动态',
-            icon: 'message',
-            status: 1,
-            sortOrder: 4,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 13:00:00',
-            updateTime: '2024-01-01 13:00:00'
-          },
-          {
-            id: 5,
-            name: '工具分享',
-            code: 'TOOL',
-            description: '开发工具和资源推荐',
-            icon: 'tools',
-            status: 0,
-            sortOrder: 5,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 14:00:00',
-            updateTime: '2024-01-01 14:00:00'
-          }
-        ]
-        resolve(mockTypes)
-      }, 200)
-    })
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return ''
+    return new Date(dateString).toLocaleString('zh-CN')
   }
 
   // 表格列配置
@@ -270,24 +194,23 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center',
-      fixed: 'left'
+      align: 'center'
     },
     {
       prop: 'name',
       label: '类型名称',
-      width: 180
+      minWidth: 200
     },
     {
       prop: 'code',
       label: '类型编码',
-      width: 150,
+      minWidth: 180,
       align: 'center'
     },
     {
       prop: 'icon',
       label: '图标',
-      width: 100,
+      width: 120,
       align: 'center',
       formatter: (row: ArticleType) => {
         return h('span', { class: 'icon-wrapper' }, row.icon)
@@ -296,7 +219,7 @@
     {
       prop: 'status',
       label: '状态',
-      width: 100,
+      width: 120,
       align: 'center',
       formatter: (row: ArticleType) => {
         return h(
@@ -311,31 +234,30 @@
     {
       prop: 'sortOrder',
       label: '排序号',
-      width: 100,
+      width: 120,
       align: 'center'
     },
     {
       prop: 'createTime',
       label: '创建时间',
-      width: 180,
+      minWidth: 200,
       formatter: (row: ArticleType) => {
-        return h('p', {}, formatDate(row.createTime))
+        return h('p', {}, formatDate(row.createTime || ''))
       }
     },
     {
       prop: 'updateTime',
       label: '更新时间',
-      width: 180,
+      minWidth: 200,
       formatter: (row: ArticleType) => {
-        return h('p', {}, formatDate(row.updateTime))
+        return h('p', {}, formatDate(row.updateTime || ''))
       }
     },
     {
       prop: 'operation',
       label: '操作',
-      width: 180,
+      width: 140,
       align: 'right',
-      fixed: 'right',
       formatter: (row: ArticleType) => {
         const buttonStyle = { style: 'text-align: right' }
 
@@ -353,43 +275,33 @@
     }
   ])
 
-  // 模拟数据获取API函数
-  const mockFetchTypeList = async () => {
-    return new Promise<{
-      items: ArticleType[]
-      total: number
-    }>((resolve) => {
-      setTimeout(async () => {
-        let mockTypes = await fetchAllTypes()
-
-        // 应用搜索过滤
-        if (searchForm.name) {
-          mockTypes = mockTypes.filter(
-            (type) =>
-              type.name.toLowerCase().includes(searchForm.name.toLowerCase()) ||
-              type.code.toLowerCase().includes(searchForm.name.toLowerCase()) ||
-              type.description.toLowerCase().includes(searchForm.name.toLowerCase())
-          )
-        }
-
-        // 分页
-        const start = (pagination.current - 1) * pagination.size
-        const end = start + pagination.size
-        const paginatedItems = mockTypes.slice(start, end)
-
-        resolve({
-          items: paginatedItems,
-          total: mockTypes.length
-        })
-      }, 300)
-    })
+  // 真实API获取文章类型列表
+  const fetchTypeList = async () => {
+    try {
+      const response = await articleTypeApi.getArticleTypeList({
+        page: pagination.current,
+        pageSize: pagination.size,
+        keyword: searchForm.name
+      })
+      return {
+        items: response.data.list || [],
+        total: response.data.total || 0
+      }
+    } catch (error) {
+      console.error('获取文章类型列表失败:', error)
+      ElMessage.error('获取文章类型列表失败')
+      return {
+        items: [],
+        total: 0
+      }
+    }
   }
 
   // 刷新数据方法
   const refreshData = async () => {
     loading.value = true
     try {
-      const result = await mockFetchTypeList()
+      const result = await fetchTypeList()
       tableData.value = result.items
       pagination.total = result.total
 
@@ -424,8 +336,6 @@
     formData.icon = 'document'
     formData.status = 1
     formData.sortOrder = 0
-    formData.createBy = 0
-    formData.updateBy = 0
     formData.createTime = ''
     formData.updateTime = ''
     if (formRef.value) {
@@ -443,24 +353,34 @@
     isEditMode.value = true
     showDialog.value = true
     // 填充表单数据
-    Object.assign(formData, type)
+    formData.id = type.id
+    formData.name = type.name
+    formData.code = type.code || ''
+    formData.description = type.description || ''
+    formData.icon = type.icon || 'document'
+    formData.status = type.status || 1
+    formData.sortOrder = type.sortOrder || 0
+    formData.createTime = type.createTime || ''
+    formData.updateTime = type.updateTime || ''
   }
 
   const handleDelete = async (type: ArticleType) => {
     try {
-      await ElMessageBox.confirm(`确定要删除类型「${type.name}」吗？`, '确认删除', {
+      await ElMessageBox.confirm(`确定要删除文章类型「${type.name}」吗？`, '确认删除', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       })
-      // 模拟删除操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success('类型删除成功')
-      }, 300)
-    } catch (error) {
+      // 真实API删除操作
+      await articleTypeApi.deleteArticleType(type.id)
+      refreshData()
+      ElMessage.success('文章类型删除成功')
+    } catch (error: any) {
       // 用户取消删除
-      ElMessage.info('删除失败' + error)
+      if (error !== 'cancel') {
+        console.error('删除文章类型失败:', error)
+        ElMessage.error('删除文章类型失败')
+      }
     }
   }
 
@@ -470,14 +390,31 @@
     try {
       await formRef.value.validate()
 
-      // 模拟添加/更新操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success(isEditMode.value ? '类型更新成功' : '类型创建成功')
-        handleDialogClose()
-      }, 300)
+      // 真实API添加/更新操作
+      if (isEditMode.value) {
+        await articleTypeApi.updateArticleType(formData.id, {
+          name: formData.name,
+          code: formData.code,
+          icon: formData.icon,
+          status: formData.status,
+          sortOrder: formData.sortOrder
+        })
+        ElMessage.success('文章类型更新成功')
+      } else {
+        await articleTypeApi.createArticleType({
+          name: formData.name,
+          code: formData.code,
+          icon: formData.icon,
+          status: formData.status,
+          sortOrder: formData.sortOrder
+        })
+        ElMessage.success('文章类型创建成功')
+      }
+      refreshData()
+      handleDialogClose()
     } catch (error) {
       console.error('提交表单失败:', error)
+      ElMessage.error(isEditMode.value ? '文章类型更新失败' : '文章类型创建失败')
     }
   }
 

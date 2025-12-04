@@ -4,12 +4,20 @@
     <!-- 页面标题和操作区 -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-xl font-medium">分类管理</h2>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon>
-          <Plus />
-        </el-icon>
-        添加分类
-      </el-button>
+      <div class="flex gap-2">
+        <el-button @click="toggleExpand">
+          <el-icon>
+            <ArrowDown />
+          </el-icon>
+          展开/收起
+        </el-button>
+        <el-button type="primary" @click="handleAdd">
+          <el-icon>
+            <Plus />
+          </el-icon>
+          添加分类
+        </el-button>
+      </div>
     </div>
 
     <!-- 搜索区域 -->
@@ -34,19 +42,9 @@
         :columns="columns"
         :data="tableData"
         :stripe="false"
-        style="overflow-y: auto"
+        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+        :default-expand-all="false"
       />
-      <div style="display: flex; justify-content: center; margin-top: 20px">
-        <el-pagination
-          v-model:current-page="pagination.current"
-          v-model:page-size="pagination.size"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="pagination.total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
     </div>
 
     <!-- 添加/编辑分类对话框 -->
@@ -56,9 +54,16 @@
       width="500px"
       @close="handleDialogClose"
     >
-      <el-form :model="formData" :rules="rules" ref="formRef">
+      <el-form
+        :model="formData"
+        :rules="rules"
+        ref="formRef"
+        label-width="100px"
+        label-position="right"
+        style="max-width: 450px; margin: 0 auto"
+      >
         <el-form-item label="分类名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入分类名称" />
+          <el-input v-model="formData.name" placeholder="请输入分类名称" style="width: 100%" />
         </el-form-item>
         <el-form-item label="分类排序" prop="sortOrder">
           <el-input-number
@@ -66,17 +71,8 @@
             :min="0"
             :max="999"
             placeholder="请输入排序号"
+            style="width: 100%"
           />
-        </el-form-item>
-        <el-form-item label="父分类" prop="parentId">
-          <el-select v-model="formData.parentId" placeholder="请选择父分类" style="width: 100%">
-            <el-option label="顶级分类" :value="0" />
-            <el-option label="前端开发" :value="1" />
-            <el-option label="后端开发" :value="2" />
-            <el-option label="数据库" :value="3" />
-            <el-option label="算法" :value="4" />
-            <el-option label="人工智能" :value="5" />
-          </el-select>
         </el-form-item>
         <el-form-item label="分类描述" prop="description">
           <el-input
@@ -84,6 +80,7 @@
             placeholder="请输入分类描述"
             type="textarea"
             :rows="2"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -103,29 +100,18 @@
 
 <script setup lang="ts">
   import { ref, reactive, onMounted, h } from 'vue'
-  import { Search, Plus } from '@element-plus/icons-vue'
+  import { Search, Plus, ArrowDown } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox, ElForm, FormInstance } from 'element-plus'
   import ArtTable from '@/components/core/tables/art-table/index.vue'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { categoryApi } from '@/api/article'
 
   // 定义事件
   const emit = defineEmits(['refresh'])
 
-  // 定义分类接口
-  interface Category {
-    id: number
-    name: string
-    parentId: number
-    description: string
-    articleCount: number
-    status: number
-    sortOrder: number
-    createBy: number
-    updateBy: number
-    createTime: string
-    updateTime: string
-  }
+  // 导入类型
+  import type { Category } from '@/types/api/article'
 
   // 响应式数据
   const searchForm = reactive({
@@ -136,6 +122,8 @@
   const formRef = ref<FormInstance>()
   const loading = ref(false)
   const tableRef = ref()
+  // 展开/收起状态管理
+  const isAllExpanded = ref(false)
 
   // 表单数据
   const formData = reactive({
@@ -145,9 +133,6 @@
     description: '',
     status: 1,
     sortOrder: 0,
-    articleCount: 0,
-    createBy: 0,
-    updateBy: 0,
     createTime: '',
     updateTime: ''
   })
@@ -180,145 +165,69 @@
   }
 
   // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN')
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return ''
+    return new Date(dateString).toLocaleString('zh-CN')
   }
 
-  // 模拟获取所有分类
+  // 真实API获取所有分类
   const fetchAllCategories = async () => {
-    return new Promise<Category[]>((resolve) => {
-      setTimeout(() => {
-        const mockCategories = [
-          {
-            id: 1,
-            name: '前端开发',
-            parentId: 0,
-            description: '前端开发相关技术文章',
-            articleCount: 20,
-            status: 1,
-            sortOrder: 1,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 10:00:00',
-            updateTime: '2024-01-01 10:00:00'
-          },
-          {
-            id: 2,
-            name: '后端开发',
-            parentId: 0,
-            description: '后端开发相关技术文章',
-            articleCount: 15,
-            status: 1,
-            sortOrder: 2,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 11:00:00',
-            updateTime: '2024-01-01 11:00:00'
-          },
-          {
-            id: 3,
-            name: '数据库',
-            parentId: 0,
-            description: '数据库相关技术文章',
-            articleCount: 8,
-            status: 1,
-            sortOrder: 3,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 12:00:00',
-            updateTime: '2024-01-01 12:00:00'
-          },
-          {
-            id: 4,
-            name: '算法',
-            parentId: 0,
-            description: '算法与数据结构相关文章',
-            articleCount: 12,
-            status: 1,
-            sortOrder: 4,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 13:00:00',
-            updateTime: '2024-01-01 13:00:00'
-          },
-          {
-            id: 5,
-            name: '人工智能',
-            parentId: 0,
-            description: '人工智能相关技术文章',
-            articleCount: 6,
-            status: 1,
-            sortOrder: 5,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-01 14:00:00',
-            updateTime: '2024-01-01 14:00:00'
-          },
-          {
-            id: 6,
-            name: 'Vue.js',
-            parentId: 1,
-            description: 'Vue.js框架相关文章',
-            articleCount: 8,
-            status: 1,
-            sortOrder: 1,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-02 10:00:00',
-            updateTime: '2024-01-02 10:00:00'
-          },
-          {
-            id: 7,
-            name: 'React',
-            parentId: 1,
-            description: 'React框架相关文章',
-            articleCount: 6,
-            status: 0,
-            sortOrder: 2,
-            createBy: 1,
-            updateBy: 1,
-            createTime: '2024-01-02 11:00:00',
-            updateTime: '2024-01-02 11:00:00'
-          }
-        ]
-        resolve(mockCategories)
-      }, 200)
+    try {
+      const response = await categoryApi.getCategoryList({
+        keyword: searchForm.name
+      })
+      return response.data.list || []
+    } catch (error) {
+      console.error('获取分类列表失败:', error)
+      ElMessage.error('获取分类列表失败')
+      return []
+    }
+  }
+
+  // 将扁平数据转换为树形结构
+  const convertToTree = (categories: Category[]): Category[] => {
+    const categoryMap = new Map<number, Category>()
+    const rootCategories: Category[] = []
+
+    // 首先将所有分类放入Map中
+    categories.forEach((category) => {
+      categoryMap.set(category.id, { ...category, children: [], hasChildren: false })
     })
+
+    // 然后构建树形结构
+    categories.forEach((category) => {
+      const currentCategory = categoryMap.get(category.id) as Category
+      if (category.parentId === 0) {
+        // 顶级分类
+        rootCategories.push(currentCategory)
+      } else {
+        // 子分类，添加到父分类的children数组中
+        const parentId = category.parentId || 0
+        const parentCategory = categoryMap.get(parentId)
+        if (parentCategory) {
+          if (!parentCategory.children) {
+            parentCategory.children = []
+          }
+          parentCategory.children.push(currentCategory)
+          parentCategory.hasChildren = true
+        }
+      }
+    })
+
+    return rootCategories
   }
 
   // 表格列配置
   const { columns } = useTableColumns(() => [
     {
-      prop: 'id',
-      label: 'ID',
-      width: 80,
-      align: 'center',
-      fixed: 'left'
-    },
-    {
       prop: 'name',
       label: '分类名称',
-      width: 180,
-      formatter: (row: Category) => {
-        // 为子分类添加缩进
-        const indent = row.parentId > 0 ? '└─ ' : ''
-        return h('span', null, indent + row.name)
-      }
-    },
-    {
-      prop: 'parentId',
-      label: '父分类',
-      width: 120,
-      align: 'center',
-      formatter: (row: Category) => {
-        return h('span', null, row.parentId === 0 ? '顶级分类' : row.parentId.toString())
-      }
+      width: 220
     },
     {
       prop: 'description',
       label: '分类描述',
-      width: 250
+      minWidth: 250
     },
     {
       prop: 'sortOrder',
@@ -338,7 +247,7 @@
             type: row.status === 1 ? 'success' : 'danger',
             size: 'small'
           },
-          row.status === 1 ? '启用' : '禁用'
+          (row.status || 0) === 1 ? '启用' : '禁用'
         )
       }
     },
@@ -346,14 +255,17 @@
       prop: 'articleCount',
       label: '文章数量',
       width: 120,
-      align: 'center'
+      align: 'center',
+      formatter: (row: Category) => {
+        return (row.articleCount || 0).toString()
+      }
     },
     {
       prop: 'createTime',
       label: '创建时间',
-      width: 200,
+      minWidth: 200,
       formatter: (row: Category) => {
-        return h('p', {}, formatDate(row.createTime))
+        return h('p', {}, formatDate(row.createTime || ''))
       }
     },
     {
@@ -361,11 +273,14 @@
       label: '操作',
       width: 180,
       align: 'right',
-      fixed: 'right',
       formatter: (row: Category) => {
         const buttonStyle = { style: 'text-align: right' }
 
         return h('div', buttonStyle, [
+          h(ArtButtonTable, {
+            type: 'add',
+            onClick: () => handleAddSubCategory(row)
+          }),
           h(ArtButtonTable, {
             type: 'edit',
             onClick: () => handleEdit(row)
@@ -379,42 +294,33 @@
     }
   ])
 
-  // 模拟数据获取API函数
-  const mockFetchCategoryList = async () => {
-    return new Promise<{
-      items: Category[]
-      total: number
-    }>((resolve) => {
-      setTimeout(async () => {
-        let mockCategories = await fetchAllCategories()
+  // 真实API获取分类列表
+  const fetchCategoryList = async () => {
+    try {
+      const mockCategories = await fetchAllCategories()
+      // 转换为树形结构
+      const treeData = convertToTree(mockCategories)
 
-        // 应用搜索过滤
-        if (searchForm.name) {
-          mockCategories = mockCategories.filter((category) =>
-            category.name.toLowerCase().includes(searchForm.name.toLowerCase())
-          )
-        }
-
-        // 分页
-        const start = (pagination.current - 1) * pagination.size
-        const end = start + pagination.size
-        const paginatedItems = mockCategories.slice(start, end)
-
-        resolve({
-          items: paginatedItems,
-          total: mockCategories.length
-        })
-      }, 300)
-    })
+      return {
+        items: treeData,
+        total: treeData.length
+      }
+    } catch (error) {
+      console.error('获取分类列表失败:', error)
+      ElMessage.error('获取分类列表失败')
+      return {
+        items: [],
+        total: 0
+      }
+    }
   }
 
   // 刷新数据方法
   const refreshData = async () => {
     loading.value = true
     try {
-      const result = await mockFetchCategoryList()
+      const result = await fetchCategoryList()
       tableData.value = result.items
-      pagination.total = result.total
 
       // 触发父组件的刷新事件
       emit('refresh')
@@ -442,9 +348,12 @@
   const resetFormData = () => {
     formData.id = 0
     formData.name = ''
-    formData.sort = 0
-    formData.article_count = 0
-    formData.create_time = ''
+    formData.parentId = 0
+    formData.description = ''
+    formData.status = 1
+    formData.sortOrder = 0
+    formData.createTime = ''
+    formData.updateTime = ''
     if (formRef.value) {
       formRef.value.resetFields()
     }
@@ -454,6 +363,16 @@
     isEditMode.value = false
     showDialog.value = true
     resetFormData()
+    // 确保添加顶级分类时父分类ID为0
+    formData.parentId = 0
+  }
+
+  const handleAddSubCategory = (parentCategory: Category) => {
+    isEditMode.value = false
+    showDialog.value = true
+    resetFormData()
+    // 设置父分类ID为当前分类的ID，添加子分类
+    formData.parentId = parentCategory.id
   }
 
   const handleEdit = (category: Category) => {
@@ -462,15 +381,12 @@
     // 填充表单数据
     formData.id = category.id
     formData.name = category.name
-    formData.parentId = category.parentId
-    formData.description = category.description
-    formData.status = category.status
-    formData.sortOrder = category.sortOrder
-    formData.articleCount = category.articleCount
-    formData.createBy = category.createBy
-    formData.updateBy = category.updateBy
-    formData.createTime = category.createTime
-    formData.updateTime = category.updateTime
+    formData.parentId = category.parentId || 0
+    formData.description = category.description || ''
+    formData.status = category.status || 1
+    formData.sortOrder = category.sortOrder || 0
+    formData.createTime = category.createTime || ''
+    formData.updateTime = category.updateTime || ''
   }
 
   const handleDelete = async (category: Category) => {
@@ -480,14 +396,16 @@
         cancelButtonText: '取消',
         type: 'warning'
       })
-      // 模拟删除操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success('分类删除成功')
-      }, 300)
-    } catch (error) {
+      // 真实API删除操作
+      await categoryApi.deleteCategory(category.id)
+      refreshData()
+      ElMessage.success('分类删除成功')
+    } catch (error: any) {
       // 用户取消删除
-      ElMessage.info('删除失败' + error)
+      if (error !== 'cancel') {
+        console.error('删除分类失败:', error)
+        ElMessage.error('删除分类失败')
+      }
     }
   }
 
@@ -497,14 +415,31 @@
     try {
       await formRef.value.validate()
 
-      // 模拟添加/更新操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success(isEditMode.value ? '分类更新成功' : '分类创建成功')
-        handleDialogClose()
-      }, 300)
+      // 真实API添加/更新操作
+      if (isEditMode.value) {
+        await categoryApi.updateCategory(formData.id, {
+          name: formData.name,
+          parentId: formData.parentId,
+          description: formData.description,
+          status: formData.status,
+          sortOrder: formData.sortOrder
+        })
+        ElMessage.success('分类更新成功')
+      } else {
+        await categoryApi.createCategory({
+          name: formData.name,
+          parentId: formData.parentId,
+          description: formData.description,
+          status: formData.status,
+          sortOrder: formData.sortOrder
+        })
+        ElMessage.success('分类创建成功')
+      }
+      refreshData()
+      handleDialogClose()
     } catch (error) {
       console.error('提交表单失败:', error)
+      ElMessage.error(isEditMode.value ? '分类更新失败' : '分类创建失败')
     }
   }
 
@@ -514,15 +449,22 @@
     resetFormData()
   }
 
-  // 分页处理
-  const handleSizeChange = (size: number) => {
-    pagination.size = size
-    refreshData()
-  }
-
-  const handleCurrentChange = (current: number) => {
-    pagination.current = current
-    refreshData()
+  // 树形表格相关功能
+  const toggleExpand = () => {
+    // 切换展开/收起状态
+    isAllExpanded.value = !isAllExpanded.value
+    if (tableRef.value?.elTableRef && tableData.value) {
+      const expandAll = isAllExpanded.value
+      const processRows = (rows: Category[]) => {
+        rows.forEach((row) => {
+          if (row.children?.length) {
+            tableRef.value?.elTableRef.toggleRowExpansion(row, expandAll)
+            processRows(row.children)
+          }
+        })
+      }
+      processRows(tableData.value)
+    }
   }
 
   // 组件挂载时获取数据

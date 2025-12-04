@@ -34,7 +34,6 @@
         :columns="columns"
         :data="tableData"
         :stripe="false"
-        style="overflow-y: auto"
       />
       <div style="display: flex; justify-content: center; margin-top: 20px">
         <el-pagination
@@ -56,9 +55,16 @@
       width="500px"
       @close="handleDialogClose"
     >
-      <el-form :model="formData" :rules="rules" ref="formRef">
+      <el-form
+        :model="formData"
+        :rules="rules"
+        ref="formRef"
+        label-width="100px"
+        label-position="right"
+        style="max-width: 450px; margin: 0 auto"
+      >
         <el-form-item label="标签名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入标签名称" />
+          <el-input v-model="formData.name" placeholder="请输入标签名称" style="width: 100%" />
         </el-form-item>
         <el-form-item label="标签排序" prop="sortOrder">
           <el-input-number
@@ -66,15 +72,21 @@
             :min="0"
             :max="999"
             placeholder="请输入排序号"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="文字颜色" prop="color">
-          <el-input v-model="formData.color" placeholder="请输入文字颜色（如：#303133）" />
+          <el-input
+            v-model="formData.color"
+            placeholder="请输入文字颜色（如：#303133）"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="背景颜色" prop="backgroundColor">
           <el-input
             v-model="formData.backgroundColor"
             placeholder="请输入背景颜色（如：#F5F7FA）"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -99,23 +111,13 @@
   import ArtTable from '@/components/core/tables/art-table/index.vue'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { tagApi } from '@/api/article'
 
   // 定义事件
   const emit = defineEmits(['refresh'])
 
-  // 定义标签接口
-  interface Tag {
-    id: number
-    name: string
-    color: string
-    backgroundColor: string
-    sortOrder: number
-    status: number
-    usageCount: number
-    createBy: number
-    createTime: string
-    updateTime: string
-  }
+  // 导入类型
+  import type { Tag } from '@/types/api/article'
 
   // 响应式数据
   const searchForm = reactive({
@@ -136,7 +138,6 @@
     sortOrder: 0,
     status: 1,
     usageCount: 0,
-    createBy: 0,
     createTime: '',
     updateTime: ''
   })
@@ -184,104 +185,9 @@
   }
 
   // 格式化日期
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN')
-  }
-
-  // 模拟获取所有标签
-  const fetchAllTags = async () => {
-    return new Promise<Tag[]>((resolve) => {
-      setTimeout(() => {
-        const mockTags = [
-          {
-            id: 1,
-            name: 'Vue',
-            color: '#42b883',
-            backgroundColor: '#e6f7ff',
-            sortOrder: 1,
-            status: 1,
-            usageCount: 12,
-            createBy: 1,
-            createTime: '2024-01-01 10:00:00',
-            updateTime: '2024-01-01 10:00:00'
-          },
-          {
-            id: 2,
-            name: 'React',
-            color: '#61dafb',
-            backgroundColor: '#f0f9ff',
-            sortOrder: 2,
-            status: 1,
-            usageCount: 8,
-            createBy: 1,
-            createTime: '2024-01-01 11:00:00',
-            updateTime: '2024-01-01 11:00:00'
-          },
-          {
-            id: 3,
-            name: 'TypeScript',
-            color: '#3178c6',
-            backgroundColor: '#ecf5ff',
-            sortOrder: 3,
-            status: 1,
-            usageCount: 15,
-            createBy: 1,
-            createTime: '2024-01-01 12:00:00',
-            updateTime: '2024-01-01 12:00:00'
-          },
-          {
-            id: 4,
-            name: 'Node.js',
-            color: '#68a063',
-            backgroundColor: '#f0f9ff',
-            sortOrder: 4,
-            status: 1,
-            usageCount: 10,
-            createBy: 1,
-            createTime: '2024-01-01 13:00:00',
-            updateTime: '2024-01-01 13:00:00'
-          },
-          {
-            id: 5,
-            name: 'Webpack',
-            color: '#8dd6f9',
-            backgroundColor: '#f0f8ff',
-            sortOrder: 5,
-            status: 1,
-            usageCount: 6,
-            createBy: 1,
-            createTime: '2024-01-01 14:00:00',
-            updateTime: '2024-01-01 14:00:00'
-          },
-          {
-            id: 6,
-            name: 'CSS3',
-            color: '#1572b6',
-            backgroundColor: '#f0f9ff',
-            sortOrder: 6,
-            status: 1,
-            usageCount: 9,
-            createBy: 1,
-            createTime: '2024-01-01 15:00:00',
-            updateTime: '2024-01-01 15:00:00'
-          },
-          {
-            id: 7,
-            name: 'JavaScript',
-            color: '#f7df1e',
-            backgroundColor: '#fffbe6',
-            sortOrder: 7,
-            status: 0,
-            usageCount: 20,
-            createBy: 1,
-            createTime: '2024-01-01 16:00:00',
-            updateTime: '2024-01-01 16:00:00'
-          }
-        ]
-        resolve(mockTags)
-      }, 200)
-    })
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return ''
+    return new Date(dateString).toLocaleString('zh-CN')
   }
 
   // 表格列配置
@@ -290,13 +196,12 @@
       prop: 'id',
       label: 'ID',
       width: 80,
-      align: 'center',
-      fixed: 'left'
+      align: 'center'
     },
     {
       prop: 'name',
       label: '标签名称',
-      width: 180,
+      minWidth: 200,
       formatter: (row: Tag) => {
         return h(
           'span',
@@ -316,7 +221,7 @@
     {
       prop: 'color',
       label: '文字颜色',
-      width: 120,
+      minWidth: 140,
       formatter: (row: Tag) => {
         return h(
           'div',
@@ -345,7 +250,7 @@
     {
       prop: 'backgroundColor',
       label: '背景颜色',
-      width: 120,
+      minWidth: 140,
       formatter: (row: Tag) => {
         return h(
           'div',
@@ -374,13 +279,13 @@
     {
       prop: 'sortOrder',
       label: '排序号',
-      width: 100,
+      width: 120,
       align: 'center'
     },
     {
       prop: 'status',
       label: '状态',
-      width: 100,
+      width: 120,
       align: 'center',
       formatter: (row: Tag) => {
         return h(
@@ -396,23 +301,22 @@
     {
       prop: 'usageCount',
       label: '文章数量',
-      width: 120,
+      width: 140,
       align: 'center'
     },
     {
       prop: 'createTime',
       label: '创建时间',
-      width: 200,
+      width: 220,
       formatter: (row: Tag) => {
-        return h('p', {}, formatDate(row.createTime))
+        return h('p', {}, formatDate(row.createTime || ''))
       }
     },
     {
       prop: 'operation',
       label: '操作',
-      width: 180,
+      width: 140,
       align: 'right',
-      fixed: 'right',
       formatter: (row: Tag) => {
         const buttonStyle = { style: 'text-align: right' }
 
@@ -430,40 +334,33 @@
     }
   ])
 
-  // 模拟数据获取API函数
-  const mockFetchTagList = async () => {
-    return new Promise<{
-      items: Tag[]
-      total: number
-    }>((resolve) => {
-      setTimeout(async () => {
-        let mockTags = await fetchAllTags()
-
-        // 应用搜索过滤
-        if (searchForm.name) {
-          mockTags = mockTags.filter((tag) =>
-            tag.name.toLowerCase().includes(searchForm.name.toLowerCase())
-          )
-        }
-
-        // 分页
-        const start = (pagination.current - 1) * pagination.size
-        const end = start + pagination.size
-        const paginatedItems = mockTags.slice(start, end)
-
-        resolve({
-          items: paginatedItems,
-          total: mockTags.length
-        })
-      }, 300)
-    })
+  // 真实API获取标签列表
+  const fetchTagList = async () => {
+    try {
+      const response = await tagApi.getTagList({
+        page: pagination.current,
+        pageSize: pagination.size,
+        keyword: searchForm.name
+      })
+      return {
+        items: response.data.list || [],
+        total: response.data.total || 0
+      }
+    } catch (error) {
+      console.error('获取标签列表失败:', error)
+      ElMessage.error('获取标签列表失败')
+      return {
+        items: [],
+        total: 0
+      }
+    }
   }
 
   // 刷新数据方法
   const refreshData = async () => {
     loading.value = true
     try {
-      const result = await mockFetchTagList()
+      const result = await fetchTagList()
       tableData.value = result.items
       pagination.total = result.total
 
@@ -493,9 +390,9 @@
   const resetFormData = () => {
     formData.id = 0
     formData.name = ''
-    formData.sort = 0
-    formData.article_count = 0
-    formData.create_time = ''
+    formData.sortOrder = 0
+    formData.usageCount = 0
+    formData.createTime = ''
     if (formRef.value) {
       formRef.value.resetFields()
     }
@@ -513,14 +410,13 @@
     // 填充表单数据
     formData.id = tag.id
     formData.name = tag.name
-    formData.color = tag.color
-    formData.backgroundColor = tag.backgroundColor
-    formData.sortOrder = tag.sortOrder
-    formData.status = tag.status
-    formData.usageCount = tag.usageCount
-    formData.createBy = tag.createBy
-    formData.createTime = tag.createTime
-    formData.updateTime = tag.updateTime
+    formData.color = tag.color || '#303133'
+    formData.backgroundColor = tag.backgroundColor || '#F5F7FA'
+    formData.sortOrder = tag.sortOrder || 0
+    formData.status = tag.status || 1
+    formData.usageCount = tag.usageCount || 0
+    formData.createTime = tag.createTime || ''
+    formData.updateTime = tag.updateTime || ''
   }
 
   const handleDelete = async (tag: Tag) => {
@@ -530,14 +426,16 @@
         cancelButtonText: '取消',
         type: 'warning'
       })
-      // 模拟删除操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success('标签删除成功')
-      }, 300)
-    } catch (error) {
+      // 真实API删除操作
+      await tagApi.deleteTag(tag.id)
+      refreshData()
+      ElMessage.success('标签删除成功')
+    } catch (error: any) {
       // 用户取消删除
-      ElMessage.info('删除失败' + error)
+      if (error !== 'cancel') {
+        console.error('删除标签失败:', error)
+        ElMessage.error('删除标签失败')
+      }
     }
   }
 
@@ -547,14 +445,31 @@
     try {
       await formRef.value.validate()
 
-      // 模拟添加/更新操作
-      setTimeout(() => {
-        refreshData()
-        ElMessage.success(isEditMode.value ? '标签更新成功' : '标签创建成功')
-        handleDialogClose()
-      }, 300)
+      // 真实API添加/更新操作
+      if (isEditMode.value) {
+        await tagApi.updateTag(formData.id, {
+          name: formData.name,
+          color: formData.color,
+          backgroundColor: formData.backgroundColor,
+          sortOrder: formData.sortOrder,
+          status: formData.status
+        })
+        ElMessage.success('标签更新成功')
+      } else {
+        await tagApi.createTag({
+          name: formData.name,
+          color: formData.color,
+          backgroundColor: formData.backgroundColor,
+          sortOrder: formData.sortOrder,
+          status: formData.status
+        })
+        ElMessage.success('标签创建成功')
+      }
+      refreshData()
+      handleDialogClose()
     } catch (error) {
       console.error('提交表单失败:', error)
+      ElMessage.error(isEditMode.value ? '标签更新失败' : '标签创建失败')
     }
   }
 

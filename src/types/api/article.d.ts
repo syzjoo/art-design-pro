@@ -9,6 +9,8 @@ export interface ArticleType {
   icon?: string
   sortOrder?: number
   status?: number
+  createBy?: number
+  updateBy?: number
   createTime?: string
   updateTime?: string
 }
@@ -22,8 +24,14 @@ export interface Category {
   parentId?: number
   description?: string
   sortOrder?: number
+  status?: number
+  articleCount?: number
+  createBy?: number
+  updateBy?: number
   createTime?: string
   updateTime?: string
+  children?: Category[]
+  hasChildren?: boolean
 }
 
 /**
@@ -37,6 +45,8 @@ export interface Tag {
   usageCount?: number
   sortOrder?: number
   status?: number
+  createBy?: number
+  updateBy?: number
   createTime?: string
   updateTime?: string
 }
@@ -169,4 +179,84 @@ export interface ArticleListResponse {
   total: number
   page: number
   pageSize: number
+}
+
+/**
+ * 分类管理相关类型
+ */
+export interface CategoryQuery {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  parentId?: number
+}
+
+export interface CategoryCreateData {
+  name: string
+  parentId?: number
+  description?: string
+  sortOrder?: number
+  status?: number
+}
+
+export interface CategoryUpdateData {
+  name?: string
+  parentId?: number
+  description?: string
+  sortOrder?: number
+  status?: number
+}
+
+/**
+ * 标签管理相关类型
+ */
+export interface TagQuery {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  status?: number
+}
+
+export interface TagCreateData {
+  name: string
+  color?: string
+  backgroundColor?: string
+  sortOrder?: number
+  status?: number
+}
+
+export interface TagUpdateData {
+  name?: string
+  color?: string
+  backgroundColor?: string
+  sortOrder?: number
+  status?: number
+}
+
+/**
+ * 文章类型管理相关类型
+ */
+export interface ArticleTypeQuery {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  status?: number
+}
+
+export interface ArticleTypeCreateData {
+  name: string
+  code: string
+  description?: string
+  icon?: string
+  sortOrder?: number
+  status?: number
+}
+
+export interface ArticleTypeUpdateData {
+  name?: string
+  code?: string
+  description?: string
+  icon?: string
+  sortOrder?: number
+  status?: number
 }
