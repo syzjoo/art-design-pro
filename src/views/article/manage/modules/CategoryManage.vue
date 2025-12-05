@@ -44,6 +44,9 @@
         :stripe="false"
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         :default-expand-all="false"
+        :pagination="pagination"
+        @pagination:size-change="(val) => handlePageChange(val, 'size')"
+        @pagination:current-change="(val) => handlePageChange(val, 'current')"
       />
     </div>
 
@@ -85,8 +88,8 @@
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">禁用</el-radio>
+            <el-radio :label="'enabled'">启用</el-radio>
+            <el-radio :label="'disabled'">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -131,10 +134,10 @@
     name: '',
     parentId: 0,
     description: '',
-    status: 1,
+    status: 'enabled',
     sortOrder: 0,
-    createTime: '',
-    updateTime: ''
+    createdAt: '',
+    updatedAt: ''
   })
 
   // 表格数据和分页
@@ -170,17 +173,31 @@
     return new Date(dateString).toLocaleString('zh-CN')
   }
 
-  // 真实API获取所有分类
-  const fetchAllCategories = async () => {
+  // 真实API获取所有分类（支持分页和搜索）
+  const fetchAllCategories = async (page?: number, pageSize?: number) => {
     try {
       const response = await categoryApi.getCategoryList({
-        keyword: searchForm.name
+        keyword: searchForm.name,
+        page,
+        pageSize
       })
-      return response.data.list || []
+      // 注意：HTTP工具已经自动提取了BaseResponse的data字段
+      // 直接使用后端返回的数据结构
+      return {
+        list: response.list || [],
+        total: response.total || 0,
+        page: response.page || 1,
+        pageSize: response.pageSize || 10
+      }
     } catch (error) {
       console.error('获取分类列表失败:', error)
       ElMessage.error('获取分类列表失败')
-      return []
+      return {
+        list: [],
+        total: 0,
+        page: 1,
+        pageSize: 10
+      }
     }
   }
 
@@ -197,7 +214,8 @@
     // 然后构建树形结构
     categories.forEach((category) => {
       const currentCategory = categoryMap.get(category.id) as Category
-      if (category.parentId === 0) {
+      // 后端返回顶级分类的parentId为null
+      if (category.parentId === null || category.parentId === 0) {
         // 顶级分类
         rootCategories.push(currentCategory)
       } else {
@@ -233,7 +251,10 @@
       prop: 'sortOrder',
       label: '排序号',
       width: 100,
-      align: 'center'
+      align: 'center',
+      formatter: (row: Category) => {
+        return (row.sortOrder || 0).toString()
+      }
     },
     {
       prop: 'status',
@@ -241,13 +262,14 @@
       width: 100,
       align: 'center',
       formatter: (row: Category) => {
+        const statusValue = row.status || 'disabled'
         return h(
           'el-tag',
           {
-            type: row.status === 1 ? 'success' : 'danger',
+            type: statusValue === 'enabled' ? 'success' : 'danger',
             size: 'small'
           },
-          (row.status || 0) === 1 ? '启用' : '禁用'
+          statusValue === 'enabled' ? '启用' : '禁用'
         )
       }
     },
@@ -266,6 +288,14 @@
       minWidth: 200,
       formatter: (row: Category) => {
         return h('p', {}, formatDate(row.createTime || ''))
+      }
+    },
+    {
+      prop: 'updateTime',
+      label: '更新时间',
+      minWidth: 200,
+      formatter: (row: Category) => {
+        return h('p', {}, formatDate(row.updateTime || ''))
       }
     },
     {
@@ -297,13 +327,19 @@
   // 真实API获取分类列表
   const fetchCategoryList = async () => {
     try {
-      const mockCategories = await fetchAllCategories()
+      // 获取当前分页参数
+      const { current, size } = pagination
+      // 调用API获取分类列表
+      const result = await fetchAllCategories(current, size)
       // 转换为树形结构
-      const treeData = convertToTree(mockCategories)
+      const treeData = convertToTree(result.list)
+
+      // 更新分页总数
+      pagination.total = result.total
 
       return {
         items: treeData,
-        total: treeData.length
+        total: result.total
       }
     } catch (error) {
       console.error('获取分类列表失败:', error)
@@ -332,6 +368,19 @@
     }
   }
 
+  // 分页变化处理
+  const handlePageChange = (val: number, type?: 'size' | 'current') => {
+    if (type === 'size') {
+      // 处理每页显示条数变化
+      pagination.size = val
+      pagination.current = 1 // 重置到第一页
+    } else {
+      // 处理当前页码变化
+      pagination.current = val
+    }
+    refreshData()
+  }
+
   // 搜索处理
   const handleSearch = () => {
     pagination.current = 1
@@ -350,10 +399,8 @@
     formData.name = ''
     formData.parentId = 0
     formData.description = ''
-    formData.status = 1
+    formData.status = 'enabled'
     formData.sortOrder = 0
-    formData.createTime = ''
-    formData.updateTime = ''
     if (formRef.value) {
       formRef.value.resetFields()
     }
@@ -383,10 +430,8 @@
     formData.name = category.name
     formData.parentId = category.parentId || 0
     formData.description = category.description || ''
-    formData.status = category.status || 1
+    formData.status = category.status || 'enabled'
     formData.sortOrder = category.sortOrder || 0
-    formData.createTime = category.createTime || ''
-    formData.updateTime = category.updateTime || ''
   }
 
   const handleDelete = async (category: Category) => {
@@ -415,24 +460,21 @@
     try {
       await formRef.value.validate()
 
+      // 表单数据已适配后端API格式
+      const apiData = {
+        name: formData.name,
+        parentId: formData.parentId,
+        description: formData.description,
+        status: formData.status,
+        sortOrder: formData.sortOrder
+      }
+
       // 真实API添加/更新操作
       if (isEditMode.value) {
-        await categoryApi.updateCategory(formData.id, {
-          name: formData.name,
-          parentId: formData.parentId,
-          description: formData.description,
-          status: formData.status,
-          sortOrder: formData.sortOrder
-        })
+        await categoryApi.updateCategory(formData.id, apiData)
         ElMessage.success('分类更新成功')
       } else {
-        await categoryApi.createCategory({
-          name: formData.name,
-          parentId: formData.parentId,
-          description: formData.description,
-          status: formData.status,
-          sortOrder: formData.sortOrder
-        })
+        await categoryApi.createCategory(apiData)
         ElMessage.success('分类创建成功')
       }
       refreshData()

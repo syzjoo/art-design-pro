@@ -76,23 +76,47 @@
           />
         </el-form-item>
         <el-form-item label="文字颜色" prop="color">
-          <el-input
-            v-model="formData.color"
-            placeholder="请输入文字颜色（如：#303133）"
-            style="width: 100%"
-          />
+          <div class="color-selector-group">
+            <el-color-picker
+              v-model="formData.color"
+              show-alpha
+              placeholder="选择文字颜色"
+              style="width: 80px"
+            />
+            <div class="preset-colors">
+              <span
+                v-for="(color, index) in presetColors"
+                :key="index"
+                class="preset-color-item"
+                :style="{ backgroundColor: color.value }"
+                @click="formData.color = color.value"
+              ></span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="背景颜色" prop="backgroundColor">
-          <el-input
-            v-model="formData.backgroundColor"
-            placeholder="请输入背景颜色（如：#F5F7FA）"
-            style="width: 100%"
-          />
+          <div class="color-selector-group">
+            <el-color-picker
+              v-model="formData.backgroundColor"
+              show-alpha
+              placeholder="选择背景颜色"
+              style="width: 80px"
+            />
+            <div class="preset-colors">
+              <span
+                v-for="(color, index) in presetColors"
+                :key="index"
+                class="preset-color-item"
+                :style="{ backgroundColor: color.value }"
+                @click="formData.backgroundColor = color.value"
+              ></span>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">禁用</el-radio>
+            <el-radio :label="'enabled'">启用</el-radio>
+            <el-radio :label="'disabled'">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -129,14 +153,26 @@
   const loading = ref(false)
   const tableRef = ref()
 
+  // 常用颜色预设
+  const presetColors = [
+    { value: '#303133' },
+    { value: '#3C95FF' },
+    { value: '#07C160' },
+    { value: '#F7B955' },
+    { value: '#FF4D4F' },
+    { value: '#722ED1' },
+    { value: '#FF7D00' },
+    { value: '#F5F7FA' }
+  ]
+
   // 表单数据
-  const formData = reactive({
+  const formData = reactive<Tag>({
     id: 0,
     name: '',
     color: '#303133',
     backgroundColor: '#F5F7FA',
     sortOrder: 0,
-    status: 1,
+    status: 'enabled',
     usageCount: 0,
     createTime: '',
     updateTime: ''
@@ -290,11 +326,8 @@
       formatter: (row: Tag) => {
         return h(
           'el-tag',
-          {
-            type: row.status === 1 ? 'success' : 'danger',
-            size: 'small'
-          },
-          row.status === 1 ? '启用' : '禁用'
+          { type: row.status === 'enabled' ? 'success' : 'danger', size: 'small' },
+          row.status === 'enabled' ? '启用' : '禁用'
         )
       }
     },
@@ -342,9 +375,11 @@
         pageSize: pagination.size,
         keyword: searchForm.name
       })
+      // 注意：HTTP工具已经自动提取了BaseResponse的data字段
+      // 所以直接访问response.list和response.total即可
       return {
-        items: response.data.list || [],
-        total: response.data.total || 0
+        items: response.list || [],
+        total: response.total || 0
       }
     } catch (error) {
       console.error('获取标签列表失败:', error)
@@ -413,7 +448,7 @@
     formData.color = tag.color || '#303133'
     formData.backgroundColor = tag.backgroundColor || '#F5F7FA'
     formData.sortOrder = tag.sortOrder || 0
-    formData.status = tag.status || 1
+    formData.status = tag.status || 'active'
     formData.usageCount = tag.usageCount || 0
     formData.createTime = tag.createTime || ''
     formData.updateTime = tag.updateTime || ''
@@ -499,5 +534,33 @@
 <style scoped>
   .tag-manage {
     padding: 10px 0;
+  }
+
+  .color-selector-group {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+  }
+
+  .preset-colors {
+    display: flex;
+    gap: 8px;
+  }
+
+  .preset-color-item {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 10%);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .preset-color-item:hover {
+    box-shadow: 0 0 0 2px rgb(0 0 0 / 20%);
+    transform: scale(1.1);
   }
 </style>

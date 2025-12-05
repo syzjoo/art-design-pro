@@ -25,8 +25,8 @@ export const articleApi = {
   /**
    * 获取文章类型列表
    */
-  getArticleTypes: (): Promise<BaseResponse<ArticleType[]>> => {
-    return api.get<BaseResponse<ArticleType[]>>({
+  getArticleTypes: (): Promise<ArticleType[]> => {
+    return api.get<ArticleType[]>({
       url: `/api/article/type`
     })
   },
@@ -34,8 +34,8 @@ export const articleApi = {
   /**
    * 获取文章分类列表
    */
-  getCategories: (): Promise<BaseResponse<Category[]>> => {
-    return api.get<BaseResponse<Category[]>>({
+  getCategories: (): Promise<Category[]> => {
+    return api.get<Category[]>({
       url: `/api/article/category`
     })
   },
@@ -43,8 +43,8 @@ export const articleApi = {
   /**
    * 获取文章标签列表
    */
-  getTags: (): Promise<BaseResponse<Tag[]>> => {
-    return api.get<BaseResponse<Tag[]>>({
+  getTags: (): Promise<Tag[]> => {
+    return api.get<Tag[]>({
       url: `/api/article/tag`
     })
   },
@@ -130,24 +130,25 @@ export const articleApi = {
  */
 export const categoryApi = {
   /**
-   * 获取分类列表（支持树形结构）
+   * 获取分类列表，支持分页和搜索
+   * @param queryParams 分页和搜索参数
    */
   getCategoryList: (
-    params?: CategoryQuery
-  ): Promise<
-    BaseResponse<{
+    queryParams: CategoryQuery
+  ): Promise<{
+    list: Category[]
+    total: number
+    page: number
+    pageSize: number
+  }> => {
+    return api.get<{
       list: Category[]
       total: number
-    }>
-  > => {
-    return api.get<
-      BaseResponse<{
-        list: Category[]
-        total: number
-      }>
-    >({
-      url: `/api/article/category/list`,
-      params
+      page: number
+      pageSize: number
+    }>({
+      url: '/api/article/category/list',
+      params: queryParams
     })
   },
 
@@ -186,24 +187,25 @@ export const categoryApi = {
  */
 export const tagApi = {
   /**
-   * 获取标签列表
+   * 获取标签列表，支持分页和搜索
+   * @param queryParams 分页和搜索参数
    */
   getTagList: (
-    params?: TagQuery
-  ): Promise<
-    BaseResponse<{
+    queryParams: TagQuery
+  ): Promise<{
+    list: Tag[]
+    total: number
+    page: number
+    pageSize: number
+  }> => {
+    return api.get<{
       list: Tag[]
       total: number
-    }>
-  > => {
-    return api.get<
-      BaseResponse<{
-        list: Tag[]
-        total: number
-      }>
-    >({
-      url: `/api/article/tag/list`,
-      params
+      page: number
+      pageSize: number
+    }>({
+      url: '/api/article/tag/list',
+      params: queryParams
     })
   },
 
@@ -242,24 +244,25 @@ export const tagApi = {
  */
 export const articleTypeApi = {
   /**
-   * 获取文章类型列表
+   * 获取文章类型列表，支持分页和搜索
+   * @param queryParams 分页和搜索参数
    */
   getArticleTypeList: (
-    params?: ArticleTypeQuery
-  ): Promise<
-    BaseResponse<{
+    queryParams: ArticleTypeQuery
+  ): Promise<{
+    list: ArticleType[]
+    total: number
+    page: number
+    pageSize: number
+  }> => {
+    return api.get<{
       list: ArticleType[]
       total: number
-    }>
-  > => {
-    return api.get<
-      BaseResponse<{
-        list: ArticleType[]
-        total: number
-      }>
-    >({
-      url: `/api/article/type/list`,
-      params
+      page: number
+      pageSize: number
+    }>({
+      url: '/api/article/type/list',
+      params: queryParams
     })
   },
 
@@ -297,30 +300,40 @@ export const articleTypeApi = {
 }
 
 /**
+ * 文件类型枚举
+ */
+export enum FileType {
+  IMAGES = 'images',
+  VIDEOS = 'videos',
+  COVERS = 'covers',
+  ATTACHMENTS = 'attachments'
+}
+
+/**
  * 附件相关API
  */
 export const attachmentApi = {
   /**
    * 上传文件
    * @param formData 文件表单数据
+   * @param fileType 文件类型
    */
   uploadFile: (
-    formData: FormData
-  ): Promise<
-    BaseResponse<{
+    formData: FormData,
+    fileType: FileType = FileType.ATTACHMENTS
+  ): Promise<{
+    url: string
+    name?: string
+    id?: string
+    type?: FileType
+  }> => {
+    return api.post<{
       url: string
       name?: string
       id?: string
-    }>
-  > => {
-    return api.post<
-      BaseResponse<{
-        url: string
-        name?: string
-        id?: string
-      }>
-    >({
-      url: `/api/common/upload`,
+      type?: FileType
+    }>({
+      url: `/api/common/upload?type=${fileType}`,
       data: formData,
       headers: {
         'Content-Type': 'multipart/form-data'
@@ -331,10 +344,11 @@ export const attachmentApi = {
   /**
    * 删除附件
    * @param fileId 文件ID
+   * @param fileType 文件类型（可选，用于加速查找）
    */
-  deleteAttachment: (fileId: string): Promise<BaseResponse<any>> => {
-    return api.del<BaseResponse<any>>({
-      url: `/api/common/attachment/${fileId}`
+  deleteAttachment: (fileId: string, fileType?: FileType): Promise<any> => {
+    return api.del<any>({
+      url: `/api/common/attachment/${fileId}${fileType ? `?type=${fileType}` : ''}`
     })
   }
 }

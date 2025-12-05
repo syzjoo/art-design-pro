@@ -98,6 +98,7 @@
                 <el-option label="草稿" value="draft" />
                 <el-option label="已发布" value="published" />
                 <el-option label="审核中" value="reviewing" />
+                <el-option label="已驳回" value="rejected" />
               </el-select>
             </el-form-item>
 
@@ -123,8 +124,6 @@
                   :multiple="true"
                   :http-request="handleAttachmentUpload"
                   :before-upload="beforeAttachmentUpload"
-                  :on-success="onAttachmentSuccess"
-                  :on-error="onAttachmentError"
                   :on-remove="onAttachmentRemove"
                   :file-list="attachmentFileList"
                   :limit="5"
@@ -135,7 +134,10 @@
                   </el-button>
                   <template #tip>
                     <div class="el-upload__tip">
-                      支持常见文件格式，单个文件大小不超过5MB，最多上传5个文件
+                      支持文档、PDF等格式，单个文件大小不超过5MB，最多上传5个文件<br />
+                      <span style="color: #f56c6c"
+                        >不支持图片格式，请使用富文本编辑器或封面上传图片</span
+                      >
                     </div>
                   </template>
                 </el-upload>
@@ -144,8 +146,8 @@
           </el-form>
 
           <div class="flex justify-end">
-            <el-button type="primary" @click="submit" class="w-25">
-              {{ pageMode === PageModeEnum.Edit ? '保存' : '发布' }}
+            <el-button type="primary" @click="submit" class="w-25" :disabled="isSubmitting">
+              {{ isSubmitting ? '处理中...' : pageMode === PageModeEnum.Edit ? '保存' : '发布' }}
             </el-button>
           </div>
         </div>
@@ -165,26 +167,8 @@
   import { PageModeEnum } from '@/enums/formEnum'
   import { articleApi, attachmentApi } from '@/api/article'
   import { useCommon } from '@/hooks/core/useCommon'
-
+  import type { ArticleType, Category, Tag } from '@/types/api/article'
   defineOptions({ name: 'ArticlePublish' })
-
-  interface ArticleType {
-    id: number
-    name: string
-    code?: string
-  }
-
-  interface Category {
-    id: number
-    name: string
-    parentId?: number
-  }
-
-  interface Tag {
-    id: number
-    name: string
-    color?: string
-  }
 
   interface ArticleData {
     title: string
@@ -201,7 +185,7 @@
 
   // 接口定义已移除，未使用
   const MAX_ATTACHMENT_SIZE = 5 // MB
-  // 允许的附件文件类型
+  // 允许的附件文件类型（不包括图片）
   const ALLOWED_ATTACHMENT_TYPES = [
     'application/pdf',
     'application/msword',
@@ -210,11 +194,7 @@
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp'
+    'text/plain'
   ]
 
   const route = useRoute()
@@ -224,6 +204,7 @@
   // API路径已在封装的接口中处理
 
   const pageMode = ref<PageModeEnum>(PageModeEnum.Add)
+  const isSubmitting = ref<boolean>(false) // 提交加载状态
   const articleData = reactive<ArticleData>({
     title: '',
     content: '',
@@ -246,6 +227,29 @@
   const uploadRef = ref<InstanceType<typeof ElUpload>>()
 
   /**
+   * 清空表单数据
+   */
+  const resetForm = () => {
+    // 清空文章基本数据
+    articleData.title = ''
+    articleData.content = ''
+    articleData.summary = ''
+    articleData.categoryId = undefined
+    articleData.articleTypeId = undefined
+    articleData.coverImage = ''
+    articleData.status = 'draft'
+    articleData.isTop = false
+    articleData.isHot = false
+    articleData.publishTime = null
+    // 清空标签选择
+    selectedTags.value = []
+    // 清空编辑器内容
+    editorHtml.value = ''
+    // 清空附件列表
+    attachmentFileList.value = []
+  }
+
+  /**
    * 初始化页面模式（新增或编辑）
    */
   const initPageMode = () => {
@@ -265,18 +269,11 @@
    */
   const getArticleTypes = async () => {
     try {
-      const response = await articleApi.getArticleTypes()
-      if (response.code === ApiStatus.success) {
-        articleTypes.value = response.data || []
-      }
+      const data = await articleApi.getArticleTypes()
+      articleTypes.value = data || []
     } catch (error) {
       console.error('获取文章类型失败:', error)
-      // 失败时使用模拟数据
-      articleTypes.value = [
-        { id: 1, name: '原创', code: 'original' },
-        { id: 2, name: '转载', code: 'reprint' },
-        { id: 3, name: '翻译', code: 'translation' }
-      ]
+      articleTypes.value = []
     }
   }
 
@@ -285,21 +282,11 @@
    */
   const getCategories = async () => {
     try {
-      const response = await articleApi.getCategories()
-      if (response.code === ApiStatus.success) {
-        categories.value = response.data || []
-      }
+      const data = await articleApi.getCategories()
+      categories.value = data || []
     } catch (error) {
       console.error('获取分类列表失败:', error)
-      // 失败时使用模拟数据
-      categories.value = [
-        { id: 1, name: '前端开发', parentId: 0 },
-        { id: 2, name: '后端开发', parentId: 0 },
-        { id: 3, name: '人工智能', parentId: 0 },
-        { id: 4, name: 'Vue.js', parentId: 1 },
-        { id: 5, name: 'React', parentId: 1 },
-        { id: 6, name: 'Node.js', parentId: 2 }
-      ]
+      categories.value = []
     }
   }
 
@@ -308,21 +295,11 @@
    */
   const getTags = async () => {
     try {
-      const response = await articleApi.getTags()
-      if (response.code === ApiStatus.success) {
-        tagList.value = response.data || []
-      }
+      const data = await articleApi.getTags()
+      tagList.value = data || []
     } catch (error) {
       console.error('获取标签列表失败:', error)
-      // 失败时使用模拟数据
-      tagList.value = [
-        { id: 1, name: 'Vue', color: '#4fc08d' },
-        { id: 2, name: 'React', color: '#61dafb' },
-        { id: 3, name: 'TypeScript', color: '#3178c6' },
-        { id: 4, name: 'Node.js', color: '#339933' },
-        { id: 5, name: 'CSS', color: '#1572b6' },
-        { id: 6, name: 'JavaScript', color: '#f7df1e' }
-      ]
+      tagList.value = []
     }
   }
 
@@ -360,36 +337,14 @@
     } catch (error) {
       console.error('获取文章详情失败:', error)
       ElMessage.error('获取文章详情失败')
-
-      // 失败时使用模拟数据
-      const mockArticle = {
-        id: route.query.id,
-        title: 'Vue3 Composition API 最佳实践',
-        content: '<p>Vue3 Composition API 是Vue3的核心特性之一...</p>',
-        summary: '本文介绍Vue3 Composition API的使用方法和最佳实践',
-        articleTypeId: 1,
-        categoryId: 1,
-        tagIds: [1, 3],
-        coverImage: 'https://picsum.photos/800/400',
-        createTime: '2023-10-01 10:00:00',
-        status: 'draft',
-        isTop: false,
-        isHot: false,
-        publishTime: '2023-10-01 10:00:00'
-      }
-
-      Object.assign(articleData, mockArticle)
-      selectedTags.value = mockArticle.tagIds
-      editorHtml.value = mockArticle.content
-      createDate.value = mockArticle.createTime
     }
   }
 
   /**
-   * 格式化日期为 YYYY-MM-DD 格式
+   * 格式化日期为 YYYY-MM-DD HH:mm:ss 格式
    */
   const formatDate = (date: string | Date): string => {
-    return useDateFormat(date, 'YYYY-MM-DD').value
+    return useDateFormat(date, 'YYYY-MM-DD HH:mm:ss').value
   }
 
   /**
@@ -469,38 +424,50 @@
       articleData.publishTime = formatDate(useNow().value)
     }
 
-    // 构建附件数据
-    const attachments = attachmentFileList.value.map((file: UploadFile) => ({
-      name: file.name || '',
-      url: (file.response as any)?.data?.url || file.url || '',
-      id: (file as any).serverId || file.uid
-    }))
+    // 处理附件信息，转换为接口要求的格式
+    const attachments = attachmentFileList.value
+      .filter((file) => {
+        const hasSuccessStatus = file.status === 'success'
+        const hasServerId = !!(file as any).serverId
+        return hasSuccessStatus && hasServerId
+      })
+      .map((file) => ({
+        id: (file as any).serverId,
+        name: file.name,
+        url: file.url || '', // 确保url不为undefined
+        size: file.size,
+        type: (file.raw as File)?.type || (file as any).type || '' // 先从raw文件对象获取类型，如果没有则使用我们设置的type属性
+      }))
+
+    console.log('submitArticle - 构建的attachments数组:', attachments)
 
     const submitData = {
       ...articleData,
       tagIds: selectedTags.value,
-      attachments: attachments,
       categoryId: articleData.categoryId || 0,
-      articleTypeId: articleData.articleTypeId || 0
+      articleTypeId: articleData.articleTypeId || 0,
+      attachments
     }
 
     try {
-      let response
+      isSubmitting.value = true
       if (pageMode.value === PageModeEnum.Edit) {
-        response = await articleApi.updateArticle(route.query.id as string, submitData)
+        await articleApi.updateArticle(route.query.id as string, submitData)
       } else {
-        response = await articleApi.createArticle(submitData)
+        await articleApi.createArticle(submitData)
       }
 
-      if (response.code === ApiStatus.success) {
-        ElMessage.success(pageMode.value === PageModeEnum.Edit ? '文章更新成功' : '文章发布成功')
-        router.push({ name: 'ArticleList' })
-      } else {
-        ElMessage.error(response.message || '操作失败')
+      ElMessage.success(pageMode.value === PageModeEnum.Edit ? '文章更新成功' : '文章发布成功')
+      // 非编辑模式下清空表单
+      if (pageMode.value === PageModeEnum.Add) {
+        resetForm()
       }
+      router.push({ name: 'ArticleList' })
     } catch (error) {
       console.error('提交文章失败:', error)
       ElMessage.error('提交文章失败，请稍后重试')
+    } finally {
+      isSubmitting.value = false
     }
   }
 
@@ -521,14 +488,13 @@
       formData.append('file', file)
 
       const response = await attachmentApi.uploadFile(formData)
-      if (response.code === ApiStatus.success) {
-        articleData.coverImage = response.data.url || ''
-        ElMessage.success('封面上传成功')
-        options.onSuccess(response)
-      } else {
-        ElMessage.error('封面上传失败')
-        options.onError(new Error(response.message || '上传失败'))
+      // 由于http请求工具已经处理了响应，直接使用返回的数据
+      // 修复URL拼接逻辑，避免产生双斜杠
+      if (response.url) {
+        articleData.coverImage = response.url.startsWith('/') ? response.url : `/${response.url}`
       }
+      ElMessage.success('封面上传成功')
+      options.onSuccess({ data: response })
     } catch (error) {
       console.error('封面上传失败:', error)
       ElMessage.error('封面上传失败')
@@ -574,8 +540,14 @@
 
     // 检查文件类型
     const isAllowedType = ALLOWED_ATTACHMENT_TYPES.includes(file.type)
+    // 额外检查是否为图片类型
+    const isImageType = file.type.startsWith('image/')
+    if (isImageType) {
+      ElMessage.error('附件不支持图片格式，请使用富文本编辑器或封面上传图片')
+      return false
+    }
     if (!isAllowedType) {
-      ElMessage.error('不支持的文件格式，请上传常见的文档、图片或PDF文件')
+      ElMessage.error('不支持的文件格式，请上传常见的文档或PDF文件')
       return false
     }
 
@@ -591,18 +563,35 @@
       const formData = new FormData()
       formData.append('file', file)
 
+      // 根据文件类型自动选择上传目录
+      // attachmentApi.uploadFile不需要fileType参数，移除多余参数
       const response = await attachmentApi.uploadFile(formData)
-      if (response.code === ApiStatus.success) {
-        // 将服务器返回的文件ID保存到file对象中，以便删除时使用
-        if (file && response.data.id) {
-          ;(file as any).serverId = response.data.id
-        }
-        ElMessage.success('附件上传成功')
-        options.onSuccess(response, file)
-      } else {
-        ElMessage.error('附件上传失败')
-        options.onError(new Error(response.message || '上传失败'), file)
-      }
+      // 由于http请求工具已经处理了响应，直接使用返回的数据
+
+      console.log('handleAttachmentUpload - 上传成功，response:', response)
+      console.log('handleAttachmentUpload - 当前attachmentFileList:', attachmentFileList.value)
+
+      // 创建完整的文件对象，包含所有需要的属性
+      const uploadedFile: UploadFile = {
+        ...file,
+        status: 'success',
+        uid: file.uid,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        raw: file.raw,
+        serverId: response.id,
+        url: response.url,
+        response: { data: response }
+      } as any
+
+      // 手动将文件添加到attachmentFileList中
+      attachmentFileList.value.push(uploadedFile)
+
+      console.log('handleAttachmentUpload - 更新后的attachmentFileList:', attachmentFileList.value)
+
+      ElMessage.success('附件上传成功')
+      options.onSuccess({ data: response }, file)
     } catch (error) {
       console.error('附件上传失败:', error)
       ElMessage.error('附件上传失败')
@@ -610,33 +599,17 @@
     }
   }
 
-  /**
-   * 附件上传成功回调
-   */
-  const onAttachmentSuccess = (response: any) => {
-    if (response.code === ApiStatus.success) {
-      ElMessage.success('附件上传成功')
-    } else {
-      ElMessage.error('附件上传失败')
-    }
-  }
-
-  /**
-   * 附件上传失败回调
-   */
-  const onAttachmentError = () => {
-    ElMessage.error('文件上传失败')
-  }
+  // 附件上传成功/失败回调已移除，相关逻辑已整合到handleAttachmentUpload函数中
 
   /**
    * 附件删除回调
    */
   const onAttachmentRemove = async (file: UploadFile) => {
     try {
-      const fileWithServerId = file as any
+      const fileWithServerInfo = file as any
       // 如果文件已上传到服务器，调用API删除服务器上的文件
-      if (fileWithServerId.serverId) {
-        const response = await attachmentApi.deleteAttachment(fileWithServerId.serverId)
+      if (fileWithServerInfo.serverId) {
+        const response = await attachmentApi.deleteAttachment(fileWithServerInfo.serverId)
         if (response.code !== ApiStatus.success) {
           console.error('删除服务器文件失败:', response.message)
           // 即使服务器删除失败，也继续从本地列表移除

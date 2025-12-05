@@ -79,8 +79,8 @@
         <el-form-item label="类型状态" prop="status">
           <el-switch
             v-model="formData.status"
-            :active-value="1"
-            :inactive-value="0"
+            :active-value="'enabled'"
+            :inactive-value="'disabled'"
             active-text="启用"
             inactive-text="禁用"
             style="width: 100%"
@@ -145,7 +145,7 @@
     code: '',
     description: '',
     icon: 'document',
-    status: 1,
+    status: 'enabled',
     sortOrder: 0,
     createTime: '',
     updateTime: ''
@@ -225,9 +225,9 @@
         return h(
           'el-tag',
           {
-            type: row.status === 1 ? 'success' : 'danger'
+            type: row.status === 'enabled' ? 'success' : 'danger'
           },
-          row.status === 1 ? '启用' : '禁用'
+          row.status === 'enabled' ? '启用' : '禁用'
         )
       }
     },
@@ -283,9 +283,11 @@
         pageSize: pagination.size,
         keyword: searchForm.name
       })
+      // 注意：HTTP工具已经自动提取了BaseResponse的data字段
+      // 所以直接访问response.list和response.total即可
       return {
-        items: response.data.list || [],
-        total: response.data.total || 0
+        items: response.list || [],
+        total: response.total || 0
       }
     } catch (error) {
       console.error('获取文章类型列表失败:', error)
@@ -334,7 +336,7 @@
     formData.code = ''
     formData.description = ''
     formData.icon = 'document'
-    formData.status = 1
+    formData.status = 'enabled'
     formData.sortOrder = 0
     formData.createTime = ''
     formData.updateTime = ''
@@ -358,7 +360,7 @@
     formData.code = type.code || ''
     formData.description = type.description || ''
     formData.icon = type.icon || 'document'
-    formData.status = type.status || 1
+    formData.status = type.status || 'enabled'
     formData.sortOrder = type.sortOrder || 0
     formData.createTime = type.createTime || ''
     formData.updateTime = type.updateTime || ''

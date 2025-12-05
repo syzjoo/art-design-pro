@@ -8,7 +8,7 @@ export interface ArticleType {
   description?: string
   icon?: string
   sortOrder?: number
-  status?: number
+  status?: string
   createBy?: number
   updateBy?: number
   createTime?: string
@@ -21,15 +21,16 @@ export interface ArticleType {
 export interface Category {
   id: number
   name: string
-  parentId?: number
+  parentId?: number | null
   description?: string
   sortOrder?: number
-  status?: number
+  status: string
   articleCount?: number
   createBy?: number
   updateBy?: number
   createTime?: string
   updateTime?: string
+  parent?: Category
   children?: Category[]
   hasChildren?: boolean
 }
@@ -44,7 +45,7 @@ export interface Tag {
   backgroundColor?: string
   usageCount?: number
   sortOrder?: number
-  status?: number
+  status: string
   createBy?: number
   updateBy?: number
   createTime?: string
@@ -196,7 +197,7 @@ export interface CategoryCreateData {
   parentId?: number
   description?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }
 
 export interface CategoryUpdateData {
@@ -204,7 +205,7 @@ export interface CategoryUpdateData {
   parentId?: number
   description?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }
 
 /**
@@ -214,7 +215,7 @@ export interface TagQuery {
   page?: number
   pageSize?: number
   keyword?: string
-  status?: number
+  status?: string
 }
 
 export interface TagCreateData {
@@ -222,7 +223,7 @@ export interface TagCreateData {
   color?: string
   backgroundColor?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }
 
 export interface TagUpdateData {
@@ -230,7 +231,7 @@ export interface TagUpdateData {
   color?: string
   backgroundColor?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }
 
 /**
@@ -240,7 +241,7 @@ export interface ArticleTypeQuery {
   page?: number
   pageSize?: number
   keyword?: string
-  status?: number
+  status?: string
 }
 
 export interface ArticleTypeCreateData {
@@ -249,7 +250,7 @@ export interface ArticleTypeCreateData {
   description?: string
   icon?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }
 
 export interface ArticleTypeUpdateData {
@@ -258,5 +259,5 @@ export interface ArticleTypeUpdateData {
   description?: string
   icon?: string
   sortOrder?: number
-  status?: number
+  status?: string
 }

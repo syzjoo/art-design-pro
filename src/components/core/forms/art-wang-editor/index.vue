@@ -21,9 +21,10 @@
   import '@wangeditor/editor/dist/css/style.css'
   import { onBeforeUnmount, onMounted, shallowRef, computed } from 'vue'
   import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
-  import { useUserStore } from '@/store/modules/user'
   import EmojiText from '@/utils/ui/emojo'
   import { IDomEditor, IToolbarConfig, IEditorConfig } from '@wangeditor/editor'
+  import { ElMessage } from 'element-plus'
+  import api from '@/utils/http'
 
   defineOptions({ name: 'ArtWangEditor' })
 
@@ -60,7 +61,6 @@
 
   // 编辑器实例
   const editorRef = shallowRef<IDomEditor>()
-  const userStore = useUserStore()
 
   // 常量配置
   const DEFAULT_UPLOAD_CONFIG = {
@@ -69,12 +69,6 @@
     fieldName: 'file',
     allowedFileTypes: ['image/*']
   } as const
-
-  // 计算属性：上传服务器地址
-  const uploadServer = computed(
-    () =>
-      props.uploadConfig?.server || `${import.meta.env.VITE_API_URL}/api/common/upload/wangeditor`
-  )
 
   // 合并上传配置
   const mergedUploadConfig = computed(() => ({
@@ -113,12 +107,44 @@
         maxFileSize: mergedUploadConfig.value.maxFileSize,
         maxNumberOfFiles: mergedUploadConfig.value.maxNumberOfFiles,
         allowedFileTypes: mergedUploadConfig.value.allowedFileTypes,
-        server: uploadServer.value,
-        headers: {
-          Authorization: userStore.accessToken
-        },
-        onSuccess() {
-          ElMessage.success(`图片上传成功 ${EmojiText[200]}`)
+        // 使用自定义上传函数替代server配置
+        customUpload: async (file: File, insertImgFn: any) => {
+          try {
+            const formData = new FormData()
+            formData.append(mergedUploadConfig.value.fieldName, file)
+
+            // 使用项目的请求封装工具上传文件
+            const response = await api.post<{
+              id: string
+              name: string
+              url: string
+              size: number
+              type: string
+              uploadType: string
+            }>({
+              url: '/api/common/upload',
+              data: formData,
+              params: { type: 'images' },
+              showSuccessMessage: false,
+              showErrorMessage: false
+            })
+
+            // 打印完整的响应数据以便调试
+            console.log('富文本编辑器接收到的响应数据:', JSON.stringify(response, null, 2))
+
+            // 检查响应数据的结构
+            if (response && response.url) {
+              const url = response.url.startsWith('/') ? response.url : `/${response.url}`
+              insertImgFn(url)
+              ElMessage.success(`图片上传成功 ${EmojiText[200]}`)
+            } else {
+              console.error('图片上传失败：返回数据格式不正确', response)
+              ElMessage.error('图片上传失败：返回数据格式不正确')
+            }
+          } catch (error) {
+            console.error('图片上传处理失败:', error)
+            ElMessage.error('图片上传失败')
+          }
         },
         onError(file: File, err: any, res: any) {
           console.error('图片上传失败:', err, res)
