@@ -15,7 +15,9 @@ import type {
   TagUpdateData,
   ArticleTypeQuery,
   ArticleTypeCreateData,
-  ArticleTypeUpdateData
+  ArticleTypeUpdateData,
+  ArticleListQuery,
+  ArticleListResponse
 } from '../types/api/article'
 
 /**
@@ -96,31 +98,68 @@ export const articleApi = {
    * 获取文章列表
    * @param params 查询参数
    */
-  getArticleList: (params?: {
-    page?: number
-    pageSize?: number
-    categoryId?: number
-    articleTypeId?: number
-    status?: string
-    keyword?: string
-  }): Promise<
-    BaseResponse<{
-      list: ArticleDetail[]
-      total: number
-      page: number
-      pageSize: number
-    }>
-  > => {
-    return api.get<
-      BaseResponse<{
-        list: ArticleDetail[]
-        total: number
-        page: number
-        pageSize: number
-      }>
-    >({
+  getArticleList: (params?: ArticleListQuery): Promise<ArticleListResponse> => {
+    return api.get<ArticleListResponse>({
       url: `/api/article/list`,
       params
+    })
+  },
+
+  /**
+   * 置顶/取消置顶文章
+   * @param id 文章ID
+   * @param isTop 是否置顶
+   */
+  setArticleTop: (id: number, isTop: boolean): Promise<BaseResponse<any>> => {
+    return api.put<BaseResponse<any>>({
+      url: `/api/article/${id}/top`,
+      data: { isTop }
+    })
+  },
+
+  /**
+   * 设为热门/取消热门文章
+   * @param id 文章ID
+   * @param isHot 是否热门
+   */
+  setArticleHot: (id: number, isHot: boolean): Promise<BaseResponse<any>> => {
+    return api.put<BaseResponse<any>>({
+      url: `/api/article/${id}/hot`,
+      data: { isHot }
+    })
+  },
+
+  /**
+   * 批量删除文章
+   * @param ids 文章ID数组
+   */
+  batchDeleteArticles: (ids: number[]): Promise<BaseResponse<any>> => {
+    return api.del<BaseResponse<any>>({
+      url: `/api/article/batch-delete`,
+      data: { ids }
+    })
+  },
+
+  /**
+   * 批量发布文章
+   * @param ids 文章ID数组
+   */
+  batchPublishArticles: (ids: number[]): Promise<BaseResponse<any>> => {
+    return api.put<BaseResponse<any>>({
+      url: `/api/article/batch-publish`,
+      data: { ids }
+    })
+  },
+
+  /**
+   * 更新文章状态
+   * @param id 文章ID
+   * @param status 状态值
+   */
+  updateArticleStatus: (id: number, status: string): Promise<BaseResponse<any>> => {
+    return api.put<BaseResponse<any>>({
+      url: `/api/article/${id}/status`,
+      data: { status }
     })
   }
 }

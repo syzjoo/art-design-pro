@@ -5,7 +5,7 @@
     <ArtSearchBar
       v-model="formFilters"
       :items="formItems"
-      :showExpand="false"
+      :showExpand="true"
       @reset="handleReset"
       @search="handleSearch"
       class="search-bar"
@@ -56,6 +56,7 @@
         :search-params="searchParams"
         @refresh="handleRefresh"
         :loading="loading"
+        :columns="columns"
       ></TableArticleList>
 
       <!-- 文章弹窗 -->
@@ -76,6 +77,7 @@
   import TableArticleList from './modules/TableArticleList.vue'
   import ArtSearchBar from '@/components/core/forms/art-search-bar/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { articleApi } from '@/api/article'
   // import ArticleDialog from './modules/article-dialog.vue'
 
   defineOptions({ name: 'ArticleList' })
@@ -92,29 +94,21 @@
   // 搜索相关
   const initialSearchState = {
     keyword: '',
+    article_type_id: 0,
     category_id: 0,
     tag_id: 0,
-    status: 0,
-    top: 0,
-    hot: 0
+    status: '',
+    top: '',
+    hot: ''
   }
 
   const formFilters = reactive({ ...initialSearchState })
   const appliedFilters = reactive({ ...initialSearchState })
 
-  // 分类和标签数据
-  const categoryList = ref([
-    { id: 1, name: '前端开发' },
-    { id: 2, name: '后端开发' },
-    { id: 3, name: '人工智能' }
-  ])
-  const tagList = ref([
-    { id: 1, name: 'Vue' },
-    { id: 2, name: 'React' },
-    { id: 3, name: 'TypeScript' },
-    { id: 4, name: 'Node.js' },
-    { id: 5, name: 'CSS' }
-  ])
+  // 分类、标签和类型数据
+  const articleTypes = ref<any[]>([])
+  const categoryList = ref<any[]>([])
+  const tagList = ref<any[]>([])
 
   const formItems = computed(() => [
     {
@@ -123,6 +117,16 @@
       type: 'input',
       placeholder: '搜索文章标题或关键词',
       clearable: true
+    },
+    {
+      label: '文章类型',
+      key: 'article_type_id',
+      type: 'select',
+      placeholder: '选择文章类型',
+      options: [
+        { value: 0, label: '全部类型' },
+        ...articleTypes.value.map((type) => ({ value: type.id, label: type.name }))
+      ]
     },
     {
       label: '分类',
@@ -150,9 +154,9 @@
       type: 'select',
       placeholder: '文章状态',
       options: [
-        { value: 0, label: '全部状态' },
-        { value: 1, label: '已发布' },
-        { value: 2, label: '草稿' }
+        { value: '', label: '全部状态' },
+        { value: 'published', label: '已发布' },
+        { value: 'draft', label: '草稿' }
       ]
     },
     {
@@ -161,7 +165,7 @@
       type: 'select',
       placeholder: '置顶状态',
       options: [
-        { value: 0, label: '全部' },
+        { value: '', label: '全部' },
         { value: 1, label: '已置顶' },
         { value: 2, label: '未置顶' }
       ]
@@ -172,7 +176,7 @@
       type: 'select',
       placeholder: '热门状态',
       options: [
-        { value: 0, label: '全部' },
+        { value: '', label: '全部' },
         { value: 1, label: '热门' },
         { value: 2, label: '非热门' }
       ]
@@ -183,20 +187,112 @@
   const searchParams = computed(() => ({
     searchVal: appliedFilters.keyword || null,
     yearVal: '',
+    article_type_id: appliedFilters.article_type_id === 0 ? null : appliedFilters.article_type_id,
     category_id: appliedFilters.category_id === 0 ? null : appliedFilters.category_id,
     tag_id: appliedFilters.tag_id === 0 ? null : appliedFilters.tag_id,
-    status: appliedFilters.status === 0 ? null : appliedFilters.status,
-    top: appliedFilters.top === 0 ? null : appliedFilters.top,
-    hot: appliedFilters.hot === 0 ? null : appliedFilters.hot
+    status: appliedFilters.status === '' ? null : appliedFilters.status,
+    top: appliedFilters.top === '' ? null : appliedFilters.top === '1' ? 1 : 0,
+    hot: appliedFilters.hot === '' ? null : appliedFilters.hot === '1' ? 1 : 0
   }))
 
   // 表格列配置 - 使用和菜单列表相同的方式定义
-  const { columnChecks } = useTableColumns(() => [])
+  // 表格列配置 - 直接在父组件定义，用于列显隐控制
+
+  const { columns, columnChecks } = useTableColumns(() => [
+    {
+      type: 'selection',
+      width: 50,
+      align: 'center',
+      isFixed: true
+    },
+    {
+      prop: 'id',
+      label: 'ID',
+      width: 80,
+      align: 'center',
+      isFixed: true
+    },
+    {
+      prop: 'title',
+      label: '文章标题',
+      minWidth: 350
+    },
+    {
+      prop: 'categoryName',
+      label: '文章分类',
+      width: 120
+    },
+    {
+      prop: 'articleTypeName',
+      label: '文章类型',
+      width: 120
+    },
+    {
+      prop: 'tags',
+      label: '文章标签',
+      minWidth: 200
+    },
+    {
+      prop: 'viewCount',
+      label: '阅读量',
+      width: 100,
+      align: 'center'
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 100
+    },
+    {
+      prop: 'createTime',
+      label: '创建时间',
+      width: 150
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 280,
+      align: 'right',
+      fixed: 'right'
+    }
+  ])
 
   // 路由
   const router = useRouter()
 
-  onMounted(() => {
+  // 从后端获取文章类型、分类和标签数据
+  const fetchArticleTypes = async () => {
+    try {
+      const data = await articleApi.getArticleTypes()
+      articleTypes.value = data || []
+    } catch (error) {
+      console.error('获取文章类型失败:', error)
+      ElMessage.error('获取文章类型失败')
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const data = await articleApi.getCategories()
+      categoryList.value = data || []
+    } catch (error) {
+      console.error('获取分类失败:', error)
+      ElMessage.error('获取分类失败')
+    }
+  }
+
+  const fetchTags = async () => {
+    try {
+      const data = await articleApi.getTags()
+      tagList.value = data || []
+    } catch (error) {
+      console.error('获取标签失败:', error)
+      ElMessage.error('获取标签失败')
+    }
+  }
+
+  onMounted(async () => {
+    await Promise.all([fetchArticleTypes(), fetchCategories(), fetchTags()])
     refreshList()
   })
 
@@ -258,15 +354,19 @@
   /**
    * 批量发布
    */
-  const handleBatchPublish = (): void => {
-    ElMessage.success('批量发布功能开发中')
+  const handleBatchPublish = async (): Promise<void> => {
+    if (tableArticleListRef.value) {
+      await tableArticleListRef.value.batchPublish()
+    }
   }
 
   /**
    * 批量删除
    */
-  const handleBatchDelete = (): void => {
-    ElMessage.success('批量删除功能开发中')
+  const handleBatchDelete = async (): Promise<void> => {
+    if (tableArticleListRef.value) {
+      await tableArticleListRef.value.batchDelete()
+    }
   }
 
   // /**
@@ -287,6 +387,7 @@
 <style lang="scss" scoped>
   .search-bar {
     flex-shrink: 0;
-    height: 70px; // 固定搜索栏高度
+    min-height: 70px; // 使用最小高度而不是固定高度
+    margin-bottom: 16px; // 增加与表格的间距
   }
 </style>

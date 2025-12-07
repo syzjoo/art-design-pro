@@ -97,6 +97,11 @@ export interface ArticleDetail {
 }
 
 /**
+ * 文章列表项定义（不包含content字段）
+ */
+export type ArticleListItem = Omit<ArticleDetail, 'content'>
+
+/**
  * 创建文章的数据结构
  */
 export interface ArticleCreateData {
@@ -176,7 +181,7 @@ export interface ArticleListQuery {
  * 文章列表响应
  */
 export interface ArticleListResponse {
-  list: ArticleDetail[]
+  list: ArticleListItem[]
   total: number
   page: number
   pageSize: number
