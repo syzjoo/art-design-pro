@@ -64,7 +64,7 @@
         />
 
         <!-- 富文本编辑器 -->
-        <ArtWangEditor class="mt-2.5" v-model="editorHtml" />
+        <ArtWangEditor ref="editorRef" class="mt-2.5" v-model="editorHtml" />
 
         <div class="p-5 mt-5 art-card-xs">
           <h2 class="mb-5 text-xl font-medium">发布设置</h2>
@@ -168,6 +168,7 @@
   import { articleApi, attachmentApi } from '@/api/article'
   import { useCommon } from '@/hooks/core/useCommon'
   import type { ArticleType, Category, Tag } from '@/types/api/article'
+  import ArtWangEditor from '@/components/core/forms/art-wang-editor/index.vue'
   defineOptions({ name: 'ArticlePublish' })
 
   interface ArticleData {
@@ -225,6 +226,7 @@
   const createDate = ref('')
   const attachmentFileList = ref<UploadFile[]>([])
   const uploadRef = ref<InstanceType<typeof ElUpload>>()
+  const editorRef = ref<InstanceType<typeof ArtWangEditor>>()
 
   /**
    * 清空表单数据
@@ -252,13 +254,16 @@
   /**
    * 初始化页面模式（新增或编辑）
    */
-  const initPageMode = () => {
+  const initPageMode = async () => {
     const { id } = route.query
-    pageMode.value = id ? PageModeEnum.Edit : PageModeEnum.Add
 
-    if (pageMode.value === PageModeEnum.Edit) {
-      getArticleDetail()
+    // 根据是否有id参数判断页面模式
+    if (id && !isNaN(Number(id))) {
+      pageMode.value = PageModeEnum.Edit
+      await getArticleDetail()
     } else {
+      pageMode.value = PageModeEnum.Add
+      // 新增模式下设置默认创建时间和发布时间
       createDate.value = formatDate(useNow().value)
       articleData.publishTime = createDate.value
     }
@@ -309,34 +314,53 @@
   const getArticleDetail = async () => {
     try {
       const id = route.query.id as string
-      const response = await articleApi.getArticleDetail(id)
+      const article = await articleApi.getArticleDetail(id)
 
-      if (response.code === ApiStatus.success) {
-        const article = response.data
-        articleData.title = article.title || ''
-        articleData.content = article.content || ''
-        articleData.summary = article.summary || ''
-        articleData.articleTypeId = article.articleTypeId
-        articleData.categoryId = article.categoryId
-        articleData.coverImage = article.coverImage || ''
-        articleData.status = article.status || 'draft'
-        articleData.isTop = article.isTop || false
-        articleData.isHot = article.isHot || false
-        articleData.publishTime = article.publishTime || createDate.value
+      // 填充文章基本信息
+      articleData.title = article.title || ''
+      articleData.content = article.content || ''
+      articleData.summary = article.summary || ''
+      articleData.articleTypeId = article.articleTypeId
+      articleData.categoryId = article.categoryId
+      articleData.coverImage = article.coverImage || ''
+      articleData.status = article.status || 'draft'
+      articleData.isTop = article.isTop || false
+      articleData.isHot = article.isHot || false
+      articleData.publishTime = article.publishTime || createDate.value
 
-        // 设置标签
-        if (article.tags && Array.isArray(article.tags)) {
-          selectedTags.value = article.tags.map((tag: { id: number }) => tag.id)
-        } else if (article.tagIds && Array.isArray(article.tagIds)) {
-          selectedTags.value = article.tagIds
-        }
+      // 填充创建时间
+      createDate.value = article.createTime || createDate.value
 
-        editorHtml.value = article.content || ''
-        createDate.value = article.createTime || createDate.value
+      // 设置标签
+      if (article.tags && Array.isArray(article.tags)) {
+        selectedTags.value = article.tags.map((tag: { id: number }) => tag.id)
+      } else if (article.tagIds && Array.isArray(article.tagIds)) {
+        selectedTags.value = article.tagIds
+      } else {
+        selectedTags.value = []
       }
+
+      // 填充编辑器内容
+      // 先尝试直接赋值给 v-model
+      editorHtml.value = article.content || ''
+      // 如果编辑器已经初始化，使用 setHtml 方法确保内容被正确设置
+      if (editorRef.value) {
+        console.log('编辑器实例存在，使用 setHtml 方法设置内容')
+        editorRef.value.setHtml(article.content || '')
+      } else {
+        console.log('编辑器实例不存在，等待编辑器初始化完成')
+      }
+
+      // 确保获取到的数据正确显示在表单中
+      console.log('获取到的文章详情:', article)
+      console.log('填充后的表单数据:', articleData)
+      console.log('填充后的编辑器内容:', editorHtml.value)
+      console.log('填充后的标签:', selectedTags.value)
     } catch (error) {
       console.error('获取文章详情失败:', error)
-      ElMessage.error('获取文章详情失败')
+      ElMessage.error('获取文章详情失败，请重试')
+      // 如果获取文章详情失败，切换到新增模式
+      pageMode.value = PageModeEnum.Add
     }
   }
 
@@ -399,8 +423,49 @@
       /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
       ''
     )
-    // 移除不必要的样式属性
-    cleanedContent = cleanedContent.replace(/ style="[^"]*"/gi, '')
+    // 移除危险的事件属性
+    cleanedContent = cleanedContent.replace(/ on\w+="[^"]*"/gi, '')
+    // 移除iframe标签
+    cleanedContent = cleanedContent.replace(
+      /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,
+      ''
+    )
+    // 保留样式属性，但移除危险的样式
+    cleanedContent = cleanedContent.replace(/ style="([^"]*)"/gi, (match, style) => {
+      // 只保留安全的样式属性
+      const safeStyles = [
+        'color',
+        'background-color',
+        'font-size',
+        'font-weight',
+        'font-style',
+        'text-align',
+        'line-height',
+        'margin',
+        'padding',
+        'border',
+        'border-radius',
+        'width',
+        'height',
+        'display',
+        'flex',
+        'justify-content',
+        'align-items',
+        'flex-direction',
+        'list-style-type'
+      ]
+
+      const styleRules = style.split(';').filter(Boolean)
+      const filteredStyles = styleRules.filter((rule: string) => {
+        const [property] = rule.split(':').map((item: string) => item.trim())
+        return safeStyles.includes(property)
+      })
+
+      if (filteredStyles.length > 0) {
+        return ` style="${filteredStyles.join('; ')}"`
+      }
+      return ''
+    })
     return cleanedContent
   }
 
@@ -637,7 +702,9 @@
 
   onMounted(async () => {
     scrollToTop()
+    // 并行获取类型、分类和标签列表
     await Promise.all([getArticleTypes(), getCategories(), getTags()])
-    initPageMode()
+    // 初始化页面模式
+    await initPageMode()
   })
 </script>

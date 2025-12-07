@@ -13,17 +13,12 @@
   import '@/assets/styles/core/md.scss'
   import '@/assets/styles/custom/one-dark-pro.scss'
   import { useCommon } from '@/hooks/core/useCommon'
-  import axios from 'axios'
+  import { articleApi } from '@/api/article'
+  // import type { ArticleDetail } from '@/types/api/article'
+  import { onMounted, ref, computed, shallowRef } from 'vue'
+  import { useRoute } from 'vue-router'
 
   defineOptions({ name: 'ArticleDetail' })
-
-  interface ArticleResponse {
-    code: number
-    data: {
-      title: string
-      html_content: string
-    }
-  }
 
   const route = useRoute()
   const articleId = computed(() => Number(route.params.id))
@@ -39,14 +34,9 @@
     error.value = null
 
     try {
-      const { data } = await axios.get<ArticleResponse>(
-        'https://www.qiniu.lingchen.kim/blog_detail.json'
-      )
-
-      if (data.code === 200) {
-        articleTitle.value = data.data.title
-        articleHtml.value = data.data.html_content
-      }
+      const articleDetail = await articleApi.getArticleDetail(articleId.value)
+      articleTitle.value = articleDetail.title
+      articleHtml.value = articleDetail.content
     } catch (err) {
       error.value = '文章加载失败'
       console.error('获取文章详情失败:', err)

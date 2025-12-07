@@ -55,8 +55,8 @@ export const articleApi = {
    * 获取文章详情
    * @param id 文章ID
    */
-  getArticleDetail: (id: string | number): Promise<BaseResponse<ArticleDetail>> => {
-    return api.get<BaseResponse<ArticleDetail>>({
+  getArticleDetail: (id: string | number): Promise<ArticleDetail> => {
+    return api.get<ArticleDetail>({
       url: `/api/article/${id}`
     })
   },
