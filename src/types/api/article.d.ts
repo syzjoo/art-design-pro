@@ -57,11 +57,13 @@ export interface Tag {
  */
 export interface ArticleAttachment {
   id?: string
+  attachmentId?: string
   name: string
   url: string
   size?: number
   type?: string
   uploadTime?: string
+  createTime?: string
 }
 
 /**
@@ -140,20 +142,11 @@ export interface ArticleUpdateData {
 }
 
 /**
- * 通用响应结构
- */
-export interface BaseResponse<T = any> {
-  code: number
-  message: string
-  data: T
-}
-
-/**
  * 文件上传响应
  */
 export interface UploadResponse {
   code: number
-  message: string
+  msg: string
   data: {
     url: string
     name?: string
@@ -265,4 +258,45 @@ export interface ArticleTypeUpdateData {
   icon?: string
   sortOrder?: number
   status?: string
+}
+
+/**
+ * 评论相关类型
+ */
+
+/**
+ * 评论定义
+ */
+export interface Comment {
+  id: number
+  articleId: number
+  content: string
+  parentId: number
+  replyToUserId: number | null
+  likeCount: number
+  status: 'pending' | 'approved' | 'rejected'
+  author: string
+  timestamp: string
+  replies: Comment[]
+}
+
+/**
+ * 评论列表响应
+ */
+export interface CommentList {
+  records: Comment[]
+  total: number
+  current: number
+  size: number
+  pages?: number
+}
+
+/**
+ * 评论创建参数
+ */
+export interface CommentCreateParams {
+  articleId: number
+  content: string
+  parentId?: number
+  replyToUserId?: number
 }

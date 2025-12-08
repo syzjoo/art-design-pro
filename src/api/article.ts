@@ -6,7 +6,6 @@ import type {
   ArticleDetail,
   ArticleCreateData,
   ArticleUpdateData,
-  BaseResponse,
   CategoryQuery,
   CategoryCreateData,
   CategoryUpdateData,
@@ -17,8 +16,12 @@ import type {
   ArticleTypeCreateData,
   ArticleTypeUpdateData,
   ArticleListQuery,
-  ArticleListResponse
+  ArticleListResponse,
+  Comment,
+  CommentCreateParams,
+  CommentList
 } from '../types/api/article'
+import type { BaseResponse } from '../types/common/response'
 
 /**
  * 文章相关API接口
@@ -160,6 +163,68 @@ export const articleApi = {
     return api.put<BaseResponse<any>>({
       url: `/api/article/${id}/status`,
       data: { status }
+    })
+  },
+
+  /**
+   * 获取文章评论列表
+   * @param articleId 文章ID
+   */
+  getArticleComments: (articleId: number): Promise<Comment[]> => {
+    return api.get<Comment[]>({
+      url: `/api/article/${articleId}/comments`
+    })
+  },
+
+  /**
+   * 获取所有评论列表（管理端）
+   * @param params 查询参数
+   */
+  getAllComments: (params?: {
+    status?: string
+    keyword?: string
+    current?: number
+    size?: number
+  }): Promise<CommentList> => {
+    return api.get<CommentList>({
+      url: `/api/article/comments`,
+      params
+    })
+  },
+
+  /**
+   * 创建文章评论
+   * @param data 评论数据
+   */
+  createComment: (data: CommentCreateParams): Promise<BaseResponse<Comment>> => {
+    return api.post<BaseResponse<Comment>>({
+      url: `/api/article/comment`,
+      data
+    })
+  },
+
+  /**
+   * 审核评论
+   * @param commentId 评论ID
+   * @param status 审核状态
+   */
+  updateCommentStatus: (
+    commentId: number,
+    status: 'approved' | 'rejected'
+  ): Promise<BaseResponse<any>> => {
+    return api.put<BaseResponse<any>>({
+      url: `/api/article/comment/${commentId}/status`,
+      data: { status }
+    })
+  },
+
+  /**
+   * 删除评论
+   * @param commentId 评论ID
+   */
+  deleteComment: (commentId: number): Promise<BaseResponse<any>> => {
+    return api.del<BaseResponse<any>>({
+      url: `/api/article/comment/${commentId}`
     })
   }
 }

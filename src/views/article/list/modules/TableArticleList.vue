@@ -1,132 +1,137 @@
 <template>
-  <div class="w-full flex flex-col" v-if="listType === 'list'">
-    <div style="flex: 1; min-height: 0">
-      <ArtTable
-        ref="tableRef"
-        rowKey="id"
-        :loading="loading"
-        :columns="getColumnsWithFormatters"
-        :data="tableData"
-        :stripe="false"
-        :height="tableHeight"
-        @selection-change="handleSelectionChange"
-      />
-    </div>
-    <div
-      style="display: flex; justify-content: center; margin-top: 20px"
-      v-if="tableData.length || pagination.total > 0"
-    >
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="pagination.total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-  </div>
-  <div class="w-full flex flex-col" v-else-if="listType === 'card'">
-    <div
-      style="
-        max-height: calc(100vh - 400px);
-        margin-top: 10px;
-        margin-bottom: 10px;
-        overflow-y: auto;
-      "
-    >
+  <div class="table-article-list-container" :style="props.style" :class="props.class">
+    <div class="w-full flex flex-col" v-if="listType === 'list'">
+      <div style="flex: 1; min-height: 0">
+        <ArtTable
+          ref="tableRef"
+          rowKey="id"
+          :loading="props.loading"
+          :columns="getColumnsWithFormatters"
+          :data="tableData"
+          :stripe="false"
+          :height="tableHeight"
+          @selection-change="handleSelectionChange"
+        />
+      </div>
       <div
-        class="grid grid-cols-5 gap-5 max-2xl:grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1"
+        style="display: flex; justify-content: center; margin-top: 20px"
+        v-if="tableData.length || pagination.total > 0"
+      >
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="pagination.total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+    <div class="w-full flex flex-col" v-else-if="listType === 'card'">
+      <div
+        style="
+          max-height: calc(100vh - 400px);
+          margin-top: 10px;
+          margin-bottom: 10px;
+          overflow-y: auto;
+        "
       >
         <div
-          class="group c-p overflow-hidden border border-g-300/60 rounded-custom-sm"
-          v-for="item in tableData"
-          :key="item.id"
-          @click="toDetail(item)"
+          class="grid grid-cols-5 gap-5 max-2xl:grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1"
         >
-          <div class="relative aspect-[16/9.5]">
-            <el-image
-              class="flex align-center justify-center w-full h-full object-cover bg-gray-200"
-              :src="item.coverImage"
-              lazy
-              fit="cover"
-            >
-            </el-image>
-
-            <div class="absolute top-1 right-1 flex flex-col items-end gap-1">
-              <span class="bg-black/50 rounded text-xs px-1 py-0.5 text-white">{{
-                item.articleTypeName
-              }}</span>
-              <span v-if="item.isTop" class="bg-warning/80 rounded text-xs px-1 py-0.5 text-white">
-                置顶
-              </span>
-              <span v-if="item.isHot" class="bg-danger/80 rounded text-xs px-1 py-0.5 text-white">
-                热门
-              </span>
-            </div>
-
-            <span
-              v-if="item.categoryName"
-              class="absolute bottom-1 left-1 bg-black/50 rounded text-xs px-1 py-0.5 text-white"
-            >
-              {{ item.categoryName }}
-            </span>
-          </div>
-          <div class="px-2 py-1">
-            <h2 class="text-base text-g-800 font-medium">{{ item.title }}</h2>
-
-            <!-- 标签显示 -->
-            <div v-if="item.tags && item.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
-              <el-tag
-                v-for="(tag, index) in item.tags.slice(0, 3)"
-                :key="tag.id"
-                size="small"
-                :type="['success', 'warning', 'info', 'danger', 'primary'][index % 5] as any"
+          <div
+            class="group c-p overflow-hidden border border-g-300/60 rounded-custom-sm"
+            v-for="item in tableData"
+            :key="item.id"
+            @click="toDetail(item)"
+          >
+            <div class="relative aspect-[16/9.5]">
+              <el-image
+                class="flex align-center justify-center w-full h-full object-cover bg-gray-200"
+                :src="item.coverImage"
+                lazy
+                fit="cover"
               >
-                {{ tag.name }}
-              </el-tag>
-              <el-tag v-if="item.tags.length > 3" size="small" :type="'primary' as any">
-                +{{ item.tags.length - 3 }}
-              </el-tag>
-            </div>
+              </el-image>
 
-            <div class="flex-b w-full h-6 mt-1">
-              <div class="flex-c text-g-500">
-                <span class="text-sm">{{ useDateFormat(item.createTime, 'YYYY-MM-DD') }}</span>
-                <div class="w-px h-3 bg-g-400 mx-3.5"></div>
-                <span class="text-sm">{{ item.viewCount }} 阅读</span>
+              <div class="absolute top-1 right-1 flex flex-col items-end gap-1">
+                <span class="bg-black/50 rounded text-xs px-1 py-0.5 text-white">{{
+                  item.articleTypeName
+                }}</span>
+                <span
+                  v-if="item.isTop"
+                  class="bg-warning/80 rounded text-xs px-1 py-0.5 text-white"
+                >
+                  置顶
+                </span>
+                <span v-if="item.isHot" class="bg-danger/80 rounded text-xs px-1 py-0.5 text-white">
+                  热门
+                </span>
               </div>
-              <el-button
-                class="opacity-0 group-hover:opacity-100"
-                size="small"
-                @click.stop="toEdit(item)"
-                :type="'primary' as any"
+
+              <span
+                v-if="item.categoryName"
+                class="absolute bottom-1 left-1 bg-black/50 rounded text-xs px-1 py-0.5 text-white"
               >
-                编辑
-              </el-button>
+                {{ item.categoryName }}
+              </span>
+            </div>
+            <div class="px-2 py-1">
+              <h2 class="text-base text-g-800 font-medium">{{ item.title }}</h2>
+
+              <!-- 标签显示 -->
+              <div v-if="item.tags && item.tags.length > 0" class="flex flex-wrap gap-1 mt-1">
+                <el-tag
+                  v-for="(tag, index) in item.tags.slice(0, 3)"
+                  :key="tag.id"
+                  size="small"
+                  :type="['success', 'warning', 'info', 'danger', 'primary'][index % 5] as any"
+                >
+                  {{ tag.name }}
+                </el-tag>
+                <el-tag v-if="item.tags.length > 3" size="small" :type="'primary' as any">
+                  +{{ item.tags.length - 3 }}
+                </el-tag>
+              </div>
+
+              <div class="flex-b w-full h-6 mt-1">
+                <div class="flex-c text-g-500">
+                  <span class="text-sm">{{ useDateFormat(item.createTime, 'YYYY-MM-DD') }}</span>
+                  <div class="w-px h-3 bg-g-400 mx-3.5"></div>
+                  <span class="text-sm">{{ item.viewCount }} 阅读</span>
+                </div>
+                <el-button
+                  class="opacity-0 group-hover:opacity-100"
+                  size="small"
+                  @click.stop="toEdit(item)"
+                  :type="'primary' as any"
+                >
+                  编辑
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <div
+        style="display: flex; justify-content: center"
+        v-if="tableData.length || pagination.total > 0"
+      >
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="pagination.total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </div>
-    <div
-      style="display: flex; justify-content: center"
-      v-if="tableData.length || pagination.total > 0"
-    >
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="pagination.total"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
+    <div class="empty-state" v-if="!tableData.length && !props.loading">
+      <el-empty description="未找到相关数据" />
     </div>
-  </div>
-  <div class="empty-state" v-if="!tableData.length && !loading">
-    <el-empty description="未找到相关数据" />
   </div>
 </template>
 
@@ -162,6 +167,10 @@
     }
     // 接收外部传入的列配置，用于列显隐控制
     columns?: any[]
+    loading?: boolean
+    // 接收外部传入的样式和类名
+    style?: any
+    class?: any
   }>()
 
   const emit = defineEmits<{
@@ -171,7 +180,6 @@
 
   const router = useRouter()
   const tableRef = ref()
-  const loading = ref(false)
 
   // 表格数据和分页
   const tableData = ref<ArticleListItem[]>([])
@@ -192,7 +200,6 @@
 
   // 真实API获取文章列表
   const fetchArticleList = async (params?: ArticleListQuery) => {
-    loading.value = true
     const {
       searchVal: keyword = '',
       yearVal = '',
@@ -231,8 +238,6 @@
         items: [],
         total: 0
       }
-    } finally {
-      loading.value = false
     }
   }
 

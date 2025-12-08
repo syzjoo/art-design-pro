@@ -147,7 +147,7 @@
 
           <div class="flex justify-end">
             <el-button type="primary" @click="submit" class="w-25" :disabled="isSubmitting">
-              {{ isSubmitting ? '处理中...' : pageMode === PageModeEnum.Edit ? '保存' : '发布' }}
+              {{ isSubmitting ? '处理中...' : pageMode === PageModeEnum.Edit ? '更新' : '发布' }}
             </el-button>
           </div>
         </div>
@@ -157,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, onMounted } from 'vue'
+  import { ref, reactive, onMounted, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { Plus } from '@element-plus/icons-vue'
   import { ElMessage, ElUpload, type UploadFile } from 'element-plus'
@@ -340,22 +340,30 @@
         selectedTags.value = []
       }
 
-      // 填充编辑器内容
-      // 先尝试直接赋值给 v-model
+      // 填充编辑器内容，通过 v-model 自动更新编辑器
       editorHtml.value = article.content || ''
-      // 如果编辑器已经初始化，使用 setHtml 方法确保内容被正确设置
-      if (editorRef.value) {
-        console.log('编辑器实例存在，使用 setHtml 方法设置内容')
-        editorRef.value.setHtml(article.content || '')
-      } else {
-        console.log('编辑器实例不存在，等待编辑器初始化完成')
-      }
 
-      // 确保获取到的数据正确显示在表单中
-      console.log('获取到的文章详情:', article)
-      console.log('填充后的表单数据:', articleData)
-      console.log('填充后的编辑器内容:', editorHtml.value)
-      console.log('填充后的标签:', selectedTags.value)
+      // 填充附件列表
+      if (article.attachments && Array.isArray(article.attachments)) {
+        // 将文章附件转换为 UploadFile 对象格式
+        attachmentFileList.value = article.attachments.map((attachment: any, index: number) => {
+          return {
+            uid: index + 1,
+            name: attachment.name || '未知文件',
+            status: 'success',
+            size: attachment.size || 0,
+            type: attachment.type || '',
+            url: attachment.url || '',
+            raw: undefined,
+            // 使用attachmentId作为serverId，因为API响应中attachmentId是唯一标识符
+            serverId: attachment.attachmentId || attachment.id || '',
+            // 确保response对象结构正确
+            response: { data: attachment }
+          } as UploadFile
+        })
+      } else {
+        attachmentFileList.value = []
+      }
     } catch (error) {
       console.error('获取文章详情失败:', error)
       ElMessage.error('获取文章详情失败，请重试')
@@ -504,8 +512,6 @@
         type: (file.raw as File)?.type || (file as any).type || '' // 先从raw文件对象获取类型，如果没有则使用我们设置的type属性
       }))
 
-    console.log('submitArticle - 构建的attachments数组:', attachments)
-
     const submitData = {
       ...articleData,
       tagIds: selectedTags.value,
@@ -633,9 +639,6 @@
       const response = await attachmentApi.uploadFile(formData)
       // 由于http请求工具已经处理了响应，直接使用返回的数据
 
-      console.log('handleAttachmentUpload - 上传成功，response:', response)
-      console.log('handleAttachmentUpload - 当前attachmentFileList:', attachmentFileList.value)
-
       // 创建完整的文件对象，包含所有需要的属性
       const uploadedFile: UploadFile = {
         ...file,
@@ -652,8 +655,6 @@
 
       // 手动将文件添加到attachmentFileList中
       attachmentFileList.value.push(uploadedFile)
-
-      console.log('handleAttachmentUpload - 更新后的attachmentFileList:', attachmentFileList.value)
 
       ElMessage.success('附件上传成功')
       options.onSuccess({ data: response }, file)
@@ -707,4 +708,18 @@
     // 初始化页面模式
     await initPageMode()
   })
+
+  // 监听路由参数变化，当编辑不同文章时重新加载数据
+  watch(
+    () => route.query.id,
+    async (newId, oldId) => {
+      if (newId && newId !== oldId) {
+        pageMode.value = PageModeEnum.Edit
+        await getArticleDetail()
+      } else if (!newId && oldId) {
+        pageMode.value = PageModeEnum.Add
+        resetForm()
+      }
+    }
+  )
 </script>
