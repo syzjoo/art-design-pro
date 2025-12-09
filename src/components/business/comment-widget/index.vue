@@ -1,6 +1,14 @@
 <template>
   <div>
     <ElForm @submit.prevent="addComment" class="w-full mx-auto mb-10">
+      <ElFormItem prop="author" class="mt-5">
+        <ElInput
+          v-model="newComment.author"
+          placeholder="你的名称"
+          class="block w-full"
+          clearable
+        />
+      </ElFormItem>
       <ElFormItem prop="content">
         <ElInput
           v-model="newComment.content"
@@ -33,90 +41,71 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue'
+  import { ref } from 'vue'
   import CommentItem from './widget/CommentItem.vue'
-  import { articleApi } from '@/api/article'
-  import { ElMessage } from 'element-plus'
-  import type { Comment } from '@/types/api/article'
+  import { commentList, Comment } from '@/mock/temp/commentDetail'
+  const comments = commentList
 
-  const props = defineProps<{
-    articleId: number
-  }>()
-
-  const comments = ref<Comment[]>([])
-  const newComment = ref<{
-    content: string
-  }>({
+  const newComment = ref<Partial<Comment>>({
+    author: '',
     content: ''
   })
 
   const showReplyForm = ref<number | null>(null)
 
-  // 获取文章评论列表
-  const fetchComments = async () => {
-    try {
-      const response = await articleApi.getArticleComments(props.articleId)
-      comments.value = response
-    } catch (error) {
-      console.error('获取评论列表失败:', error)
-      ElMessage.error('获取评论列表失败')
-    }
-  }
-
-  // 添加评论
-  const addComment = async () => {
-    if (!newComment.value.content?.trim()) {
-      ElMessage.warning('请填写评论内容')
+  const addComment = () => {
+    if (!newComment.value.author?.trim() || !newComment.value.content?.trim()) {
+      ElMessage.warning('请填写完整的评论信息')
       return
     }
 
-    try {
-      await articleApi.createComment({
-        articleId: props.articleId,
-        content: newComment.value.content.trim()
-      })
+    comments.value.push({
+      id: Date.now(),
+      author: newComment.value.author.trim(),
+      content: newComment.value.content.trim(),
+      timestamp: new Date().toISOString(),
+      replies: []
+    })
 
-      // 刷新评论列表
-      await fetchComments()
-      newComment.value.content = ''
-      ElMessage.success('评论发布成功')
-    } catch (error) {
-      console.error('发布评论失败:', error)
-      ElMessage.error('发布评论失败')
-    }
+    newComment.value.author = ''
+    newComment.value.content = ''
+    ElMessage.success('评论发布成功')
   }
 
-  // 添加回复
-  const addReply = async (commentId: number, replyAuthor: string, replyContent: string) => {
-    if (!replyContent?.trim()) {
-      ElMessage.warning('请填写回复内容')
+  const addReply = (commentId: number, replyAuthor: string, replyContent: string) => {
+    if (!replyAuthor?.trim() || !replyContent?.trim()) {
+      ElMessage.warning('请填写完整的回复信息')
       return
     }
 
-    try {
-      await articleApi.createComment({
-        articleId: props.articleId,
+    const comment = findComment(comments.value, commentId)
+    if (comment) {
+      comment.replies.push({
+        id: Date.now(),
+        author: replyAuthor.trim(),
         content: replyContent.trim(),
-        parentId: commentId
+        timestamp: new Date().toISOString(),
+        replies: []
       })
-
-      // 刷新评论列表
-      await fetchComments()
       showReplyForm.value = null
       ElMessage.success('回复发布成功')
-    } catch (error) {
-      console.error('发布回复失败:', error)
-      ElMessage.error('发布回复失败')
     }
   }
 
-  // 切换回复表单显示
   const toggleReply = (commentId: number) => {
     showReplyForm.value = showReplyForm.value === commentId ? null : commentId
   }
 
-  // 组件挂载时获取评论列表
-  onMounted(() => {
-    fetchComments()
-  })
+  const findComment = (comments: Comment[], commentId: number): Comment | undefined => {
+    for (const comment of comments) {
+      if (comment.id === commentId) {
+        return comment
+      }
+      const found = findComment(comment.replies, commentId)
+      if (found) {
+        return found
+      }
+    }
+    return undefined
+  }
 </script>

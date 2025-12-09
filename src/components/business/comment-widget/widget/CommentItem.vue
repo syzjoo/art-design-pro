@@ -35,6 +35,9 @@
     </ul>
 
     <ElForm v-if="showReplyForm === comment.id" @submit.prevent="handleSubmit" class="mt-4">
+      <ElFormItem prop="author">
+        <ElInput v-model="replyAuthor" placeholder="你的名称" clearable />
+      </ElFormItem>
       <ElFormItem prop="content">
         <ElInput
           v-model="replyContent"
@@ -57,7 +60,14 @@
 <script setup lang="ts">
   import AppConfig from '@/config'
   import { ref } from 'vue'
-  import type { Comment } from '@/types/api/article'
+
+  interface Comment {
+    id: number
+    author: string
+    content: string
+    timestamp: string
+    replies: Comment[]
+  }
 
   const props = defineProps<{
     comment: Comment
@@ -69,6 +79,7 @@
     (event: 'add-reply', commentId: number, replyAuthor: string, replyContent: string): void
   }>()
 
+  const replyAuthor = ref('')
   const replyContent = ref('')
 
   const toggleReply = (commentId: number) => {
@@ -77,14 +88,15 @@
 
   const addReply = (commentId: number, author: string, content: string) => {
     emit('add-reply', commentId, author, content)
+    replyAuthor.value = ''
     replyContent.value = ''
   }
-
   const handleSubmit = () => {
-    if (!replyContent.value.trim()) {
+    if (!replyAuthor.value.trim() || !replyContent.value.trim()) {
       return
     }
-    emit('add-reply', props.comment.id, '', replyContent.value)
+    emit('add-reply', props.comment.id, replyAuthor.value, replyContent.value)
+    replyAuthor.value = ''
     replyContent.value = ''
   }
 
