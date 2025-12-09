@@ -132,10 +132,9 @@
             最后更新：{{ formatDate(article.updateTime) }}
           </div>
 
-          <!-- 文章评论 -->
-          <div class="article-comments mt-20 mb-15">
-            <h2 class="text-2xl font-semibold mb-10">评论区</h2>
-            <CommentWidget :articleId="articleId" />
+          <!-- 评论区域 -->
+          <div class="article-comments mt-15 mb-10">
+            <CommentWidget :articleId="article.id" />
           </div>
         </div>
 
@@ -158,9 +157,10 @@
   import { useCommon } from '@/hooks/core/useCommon'
   import { articleApi } from '@/api/article'
   import type { ArticleDetail as ArticleDetailType } from '@/types/api/article'
+  import CommentWidget from '@/components/business/comment-widget/index.vue'
   import { onMounted, ref, computed } from 'vue'
   import { useRoute } from 'vue-router'
-  import CommentWidget from '@/components/business/comment-widget/index.vue'
+
   import {
     Loading,
     CircleCloseFilled,

@@ -1,14 +1,6 @@
 <template>
   <div>
     <ElForm @submit.prevent="addComment" class="w-full mx-auto mb-10">
-      <ElFormItem prop="author" class="mt-5">
-        <ElInput
-          v-model="newComment.author"
-          placeholder="你的名称"
-          class="block w-full"
-          clearable
-        />
-      </ElFormItem>
       <ElFormItem prop="content">
         <ElInput
           v-model="newComment.content"
@@ -41,54 +33,149 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { ref, onMounted } from 'vue'
   import CommentItem from './widget/CommentItem.vue'
-  import { commentList, Comment } from '@/mock/temp/commentDetail'
-  const comments = commentList
+  import { articleApi } from '@/api/article'
+  import type { Comment, CommentCreateParams } from '@/types/api/article'
+  import { ElMessage } from 'element-plus'
+  // 导入模拟数据
+  import { generateMockComments } from '@/mock/temp/commentDetail'
+  // 是否使用模拟数据（可以根据环境变量配置）
+  const USE_MOCK_DATA = import.meta.env.MODE === 'development' || true
 
-  const newComment = ref<Partial<Comment>>({
-    author: '',
+  const props = defineProps<{
+    articleId?: number
+  }>()
+
+  const comments = ref<Comment[]>([])
+
+  const newComment = ref<Partial<CommentCreateParams>>({
     content: ''
   })
 
   const showReplyForm = ref<number | null>(null)
 
-  const addComment = () => {
-    if (!newComment.value.author?.trim() || !newComment.value.content?.trim()) {
-      ElMessage.warning('请填写完整的评论信息')
-      return
+  // 获取文章评论列表
+  const fetchComments = async () => {
+    if (!props.articleId) return
+
+    try {
+      if (USE_MOCK_DATA) {
+        // 使用模拟数据
+        const mockComments = generateMockComments(props.articleId, 5)
+        comments.value = mockComments.filter((comment) => comment.status === 'approved')
+        console.log('使用模拟评论数据:', comments.value)
+      } else {
+        // 使用真实API
+        const commentList = await articleApi.getArticleComments(props.articleId)
+        // 过滤出已通过的评论
+        comments.value = commentList.filter((comment) => comment.status === 'approved')
+      }
+    } catch (error) {
+      console.error('获取评论失败:', error)
+      ElMessage.error('获取评论失败')
     }
-
-    comments.value.push({
-      id: Date.now(),
-      author: newComment.value.author.trim(),
-      content: newComment.value.content.trim(),
-      timestamp: new Date().toISOString(),
-      replies: []
-    })
-
-    newComment.value.author = ''
-    newComment.value.content = ''
-    ElMessage.success('评论发布成功')
   }
 
-  const addReply = (commentId: number, replyAuthor: string, replyContent: string) => {
-    if (!replyAuthor?.trim() || !replyContent?.trim()) {
-      ElMessage.warning('请填写完整的回复信息')
+  // 添加评论
+  const addComment = async () => {
+    if (!newComment.value.content?.trim() || !props.articleId) {
+      ElMessage.warning('请填写评论内容')
       return
     }
 
-    const comment = findComment(comments.value, commentId)
-    if (comment) {
-      comment.replies.push({
-        id: Date.now(),
-        author: replyAuthor.trim(),
+    try {
+      const commentData: CommentCreateParams = {
+        articleId: props.articleId,
+        content: newComment.value.content.trim()
+      }
+
+      if (USE_MOCK_DATA) {
+        // 使用模拟数据
+        const mockComment: Comment = {
+          id: Date.now(),
+          articleId: props.articleId!,
+          content: commentData.content,
+          parentId: 0,
+          replyToUserId: null,
+          likeCount: 0,
+          status: 'approved',
+          author: '匿名用户',
+          timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          replies: []
+        }
+        comments.value.push(mockComment)
+        newComment.value.content = ''
+        ElMessage.success('评论发布成功')
+      } else {
+        // 使用真实API
+        const response = await articleApi.createComment(commentData)
+
+        // 如果创建成功，将评论添加到列表
+        if (response.data) {
+          comments.value.push(response.data)
+          newComment.value.content = ''
+          ElMessage.success('评论发布成功')
+        }
+      }
+    } catch (error) {
+      console.error('发布评论失败:', error)
+      ElMessage.error('发布评论失败')
+    }
+  }
+
+  const addReply = async (commentId: number, replyAuthor: string, replyContent: string) => {
+    if (!replyContent?.trim() || !props.articleId) {
+      ElMessage.warning('请填写回复内容')
+      return
+    }
+
+    try {
+      const commentData: CommentCreateParams = {
+        articleId: props.articleId,
         content: replyContent.trim(),
-        timestamp: new Date().toISOString(),
-        replies: []
-      })
-      showReplyForm.value = null
-      ElMessage.success('回复发布成功')
+        parentId: commentId
+      }
+
+      if (USE_MOCK_DATA) {
+        // 使用模拟数据
+        const mockReply: Comment = {
+          id: Date.now(),
+          articleId: props.articleId!,
+          content: commentData.content,
+          parentId: commentId,
+          replyToUserId: null,
+          likeCount: 0,
+          status: 'approved',
+          author: '匿名用户',
+          timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          replies: []
+        }
+
+        // 查找父评论并添加回复
+        const parentComment = findComment(comments.value, commentId)
+        if (parentComment) {
+          parentComment.replies.push(mockReply)
+        }
+        showReplyForm.value = null
+        ElMessage.success('回复发布成功')
+      } else {
+        // 使用真实API
+        const response = await articleApi.createComment(commentData)
+
+        if (response.data) {
+          // 查找父评论并添加回复
+          const parentComment = findComment(comments.value, commentId)
+          if (parentComment) {
+            parentComment.replies.push(response.data)
+          }
+          showReplyForm.value = null
+          ElMessage.success('回复发布成功')
+        }
+      }
+    } catch (error) {
+      console.error('发布回复失败:', error)
+      ElMessage.error('发布回复失败')
     }
   }
 
@@ -108,4 +195,11 @@
     }
     return undefined
   }
+
+  // 组件挂载时获取评论列表
+  onMounted(() => {
+    if (props.articleId) {
+      fetchComments()
+    }
+  })
 </script>

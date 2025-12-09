@@ -261,8 +261,9 @@ export interface ArticleTypeUpdateData {
 }
 
 /**
- * 评论相关类型
+ * 评论状态枚举
  */
+export type CommentStatus = 'pending' | 'approved' | 'rejected'
 
 /**
  * 评论定义
@@ -274,29 +275,53 @@ export interface Comment {
   parentId: number
   replyToUserId: number | null
   likeCount: number
-  status: 'pending' | 'approved' | 'rejected'
+  status: CommentStatus
   author: string
   timestamp: string
   replies: Comment[]
 }
 
 /**
- * 评论列表响应
- */
-export interface CommentList {
-  records: Comment[]
-  total: number
-  current: number
-  size: number
-  pages?: number
-}
-
-/**
- * 评论创建参数
+ * 创建评论的参数
  */
 export interface CommentCreateParams {
   articleId: number
   content: string
   parentId?: number
-  replyToUserId?: number
+}
+
+/**
+ * 评论状态统计
+ */
+export interface CommentStatusStats {
+  pending: number
+  approved: number
+  rejected: number
+}
+
+/**
+ * 最新评论信息
+ */
+export interface LatestComment {
+  id: number
+  content: string
+  author: string
+  timestamp: string
+  status: CommentStatus
+}
+
+/**
+ * 文章评论统计信息
+ */
+export interface ArticleCommentStats {
+  articleId: number
+  articleTitle: string
+  articleSummary: string
+  publishTime: string
+  articleAuthor: string
+  totalComments: number
+  totalLikes: number
+  latestComment: LatestComment
+  commentStatusStats: CommentStatusStats
+  color?: string
 }
