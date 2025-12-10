@@ -275,10 +275,11 @@ export interface Comment {
   parentId: number
   replyToUserId: number | null
   likeCount: number
-  status: CommentStatus
+  status: 'pending' | 'approved' | 'rejected'
   author: string
   timestamp: string
   replies: Comment[]
+  rejectReason?: string
 }
 
 /**
@@ -324,4 +325,15 @@ export interface ArticleCommentStats {
   latestComment: LatestComment
   commentStatusStats: CommentStatusStats
   color?: string
+}
+
+/**
+ * 评论管理统计信息
+ */
+export interface CommentStats {
+  totalComments: number
+  approvedComments: number
+  pendingComments: number
+  rejectedComments: number
+  hotComments: number
 }

@@ -63,6 +63,16 @@ export const articleRoutes: AppRouteRecord = {
         icon: 'ri:price-tag-line',
         keepAlive: false
       }
+    },
+    {
+      path: 'comment',
+      name: 'ArticleComment',
+      component: '/article/comment',
+      meta: {
+        title: 'menus.article.comment',
+        icon: 'ri:chat-3-line',
+        keepAlive: false
+      }
     }
   ]
 }

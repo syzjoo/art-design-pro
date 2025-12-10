@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <ul class="pl-2.5" v-if="comment.replies.length > 0">
+    <ul class="pl-7 border-l-2 border-gray-100" v-if="comment.replies.length > 0">
       <CommentItem
         v-for="reply in comment.replies"
         :key="reply.id"
@@ -30,7 +30,7 @@
         :show-reply-form="showReplyForm"
         @toggle-reply="toggleReply"
         @add-reply="addReply"
-        class="mt-5"
+        class="mt-5 bg-gray-50 p-3 rounded-lg"
       />
     </ul>
 
@@ -99,7 +99,7 @@
 
     do {
       const index = Math.floor(Math.random() * AppConfig.systemMainColor.length)
-      newColor = AppConfig.systemMainColor[index]
+      newColor = AppConfig.systemMainColor[index] || '#1890ff'
     } while (newColor === lastColor)
 
     lastColor = newColor

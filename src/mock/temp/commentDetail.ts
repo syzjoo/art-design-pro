@@ -50,6 +50,25 @@ const generateRandomCommentStatus = (): CommentStatus => {
 }
 
 /**
+ * 生成随机拒绝理由
+ */
+const generateRandomRejectReason = (): string => {
+  const reasons = [
+    '内容不符合社区规范',
+    '包含广告或垃圾信息',
+    '存在敏感词汇',
+    '与文章主题无关',
+    '重复评论',
+    '语言不文明',
+    '包含违规链接',
+    '内容过于简短',
+    '存在虚假信息',
+    '其他原因'
+  ]
+  return reasons[Math.floor(Math.random() * reasons.length)]
+}
+
+/**
  * 生成随机时间
  */
 const generateRandomTime = (days: number = 30): string => {
@@ -61,6 +80,9 @@ const generateRandomTime = (days: number = 30): string => {
 /**
  * 生成模拟评论列表
  */
+// 全局计数器，确保所有评论ID唯一
+let commentIdCounter = 1
+
 export const generateMockComments = (articleId: number, count: number = 5): Comment[] => {
   const comments: Comment[] = []
 
@@ -69,33 +91,52 @@ export const generateMockComments = (articleId: number, count: number = 5): Comm
     const repliesCount = hasReplies ? Math.floor(Math.random() * 3) + 1 : 0
     const replies: Comment[] = []
 
+    // 生成主评论ID
+    const mainCommentId = commentIdCounter++
+
     for (let j = 0; j < repliesCount; j++) {
-      replies.push({
-        id: count + j + 1,
+      const status = generateRandomCommentStatus()
+      const comment: Comment = {
+        id: commentIdCounter++,
         articleId,
         content: generateRandomCommentContent(),
-        parentId: i + 1,
+        parentId: mainCommentId,
         replyToUserId: null,
         likeCount: Math.floor(Math.random() * 50),
-        status: generateRandomCommentStatus(),
+        status,
         author: generateRandomAuthor(),
         timestamp: generateRandomTime(15),
         replies: []
-      })
+      }
+
+      // 为已拒绝状态添加拒绝理由
+      if (status === 'rejected') {
+        comment.rejectReason = generateRandomRejectReason()
+      }
+
+      replies.push(comment)
     }
 
-    comments.push({
-      id: i + 1,
+    const status = generateRandomCommentStatus()
+    const comment: Comment = {
+      id: mainCommentId,
       articleId,
       content: generateRandomCommentContent(),
       parentId: 0,
       replyToUserId: null,
       likeCount: Math.floor(Math.random() * 100),
-      status: generateRandomCommentStatus(),
+      status,
       author: generateRandomAuthor(),
       timestamp: generateRandomTime(),
       replies
-    })
+    }
+
+    // 为已拒绝状态添加拒绝理由
+    if (status === 'rejected') {
+      comment.rejectReason = generateRandomRejectReason()
+    }
+
+    comments.push(comment)
   }
 
   return comments
