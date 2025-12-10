@@ -319,6 +319,7 @@
                     </ElFormItem>
                   </ElForm>
 
+                  <!-- 回复列表 -->
                   <ul
                     class="pl-7 border-l-2 border-gray-100"
                     v-if="comment.replies && comment.replies.length > 0"
@@ -368,12 +369,13 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { showError, HttpError } from '@/utils/http/error'
   import { ApiStatus } from '@/utils/http/status'
-  import type { ArticleCommentStats, Comment } from '@/types/api/article'
+  import type { ArticleCommentStats, Comment, CommentCreateParams } from '@/types/api/article'
   import AppConfig from '@/config'
   // 导入模拟数据
   import { mockArticleCommentStatsResponse, generateMockComments } from '@/mock/temp/commentDetail'
   // 是否使用模拟数据（可以根据环境变量配置）
-  const USE_MOCK_DATA = import.meta.env.MODE === 'development' || true
+  const USE_MOCK_DATA =
+    import.meta.env.MODE === 'development' && import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
   // 格式化日期
   const formatDate = (timestamp: string) => {
@@ -440,7 +442,7 @@
   const showRejectReason = ref(false)
 
   // 筛选和搜索相关状态
-  const activeView = ref('pending') // 当前视图：all, pending, approved, rejected
+  const activeView = ref<'all' | 'pending' | 'approved' | 'rejected'>('pending') // 当前视图：all, pending, approved, rejected
   const searchKeyword = ref('') // 搜索关键词
   const dateRange = ref<[string, string] | null>(null) // 日期范围
   const allComments = ref<
@@ -455,75 +457,74 @@
    */
   const fetchComments = async () => {
     try {
-      let res
+      let commentsList
 
       if (USE_MOCK_DATA) {
         // 使用模拟数据
-        res = mockArticleCommentStatsResponse()
-      } else {
-        // 使用真实API
-        res = await articleApi.getArticleCommentStats()
-      }
+        const res = mockArticleCommentStatsResponse()
+        articleCommentStats.value = res.records.map((item, index) => ({
+          ...item,
+          color: COLOR_LIST[index % COLOR_LIST.length]
+        }))
 
-      articleCommentStats.value = res.records.map((item, index) => ({
-        ...item,
-        color: COLOR_LIST[index % COLOR_LIST.length]
-      }))
-
-      // 计算评论统计数据
-      let totalComments = 0
-      let approvedComments = 0
-      let pendingCount = 0
-      let rejectedComments = 0
-      let hotComments = 0
-
-      // 提取所有评论
-      const allCommentsList: (Comment & {
-        articleTitle: string
-        articleAuthor: string
-        color: string
-      })[] = []
-      articleCommentStats.value.forEach((article) => {
-        // 生成该文章的所有评论（模拟数据）
-        const comments = generateMockComments(article.articleId, 10)
-        // 添加文章信息和颜色
-        comments.forEach((comment) => {
-          allCommentsList.push({
-            ...comment,
-            articleTitle: article.articleTitle,
-            articleAuthor: article.articleAuthor,
-            color: article.color || COLOR_LIST[0]
+        // 提取所有评论
+        const allCommentsList: (Comment & {
+          articleTitle: string
+          articleAuthor: string
+          color: string
+        })[] = []
+        articleCommentStats.value.forEach((article) => {
+          // 生成该文章的所有评论（模拟数据）
+          const comments = generateMockComments(article.articleId, 10)
+          // 添加文章信息和颜色
+          comments.forEach((comment) => {
+            allCommentsList.push({
+              ...comment,
+              articleTitle: article.articleTitle,
+              articleAuthor: article.articleAuthor,
+              color: article.color || COLOR_LIST[0]
+            })
           })
         })
 
-        // 统计评论数据
-        totalComments += article.totalComments
-        approvedComments += article.commentStatusStats.approved
-        pendingCount += article.commentStatusStats.pending
-        rejectedComments += article.commentStatusStats.rejected || 0
+        commentsList = allCommentsList
+      } else {
+        // 使用真实API
+        // 先获取文章评论统计数据，包含文章标题和作者信息
+        const statsRes = await articleApi.getArticleCommentStats()
+        const articleStatsMap = new Map<number, ArticleCommentStats>()
+        statsRes.records.forEach((stat) => {
+          articleStatsMap.set(stat.articleId, stat)
+        })
 
-        // 简单统计热门评论（点赞数>5的评论）
-        comments.forEach((comment) => {
-          if (comment.likeCount > 5) {
-            hotComments++
+        // 获取所有评论
+        const commentsRes = await articleApi.getAllComments({
+          page: 1,
+          pageSize: 100, // 设置一个较大的值以获取所有评论
+          status: activeView.value,
+          keyword: searchKeyword.value,
+          startTime: dateRange.value?.[0],
+          endTime: dateRange.value?.[1]
+        })
+
+        // 为每条评论添加文章信息和颜色
+        commentsList = commentsRes.records.map((comment, index) => {
+          const articleStat = articleStatsMap.get(comment.articleId)
+          return {
+            ...comment,
+            articleTitle: articleStat?.articleTitle || '未知文章',
+            articleAuthor: articleStat?.articleAuthor || '未知作者',
+            color: COLOR_LIST[index % COLOR_LIST.length]
           }
         })
-      })
+      }
 
-      allComments.value = allCommentsList
-      pendingComments.value = allCommentsList.filter((comment) => comment.status === 'pending')
-      filteredComments.value = allCommentsList.filter(
-        (comment) => comment.status === activeView.value
-      )
+      allComments.value = commentsList
+      pendingComments.value = commentsList.filter((comment) => comment.status === 'pending')
+      filteredComments.value = commentsList.filter((comment) => comment.status === activeView.value)
 
       // 更新统计数据
-      commentStats.value = {
-        totalComments,
-        approvedComments,
-        pendingComments: pendingCount,
-        rejectedComments,
-        hotComments
-      }
+      updateCommentStats()
     } catch (error) {
       console.error('获取评论列表失败:', error)
       if (error instanceof HttpError) {
@@ -605,7 +606,7 @@
   /**
    * 打开评论详情抽屉
    */
-  const openDrawer = (
+  const openDrawer = async (
     comment: Comment & { articleTitle: string; articleAuthor: string; color: string }
   ) => {
     showDrawer.value = true
@@ -614,146 +615,229 @@
     showRejectReason.value = false
     // 清空回复内容
     replyContent.value = ''
-    // 生成该文章的所有评论
-    articleComments.value = generateMockComments(comment.articleId, 10)
+
+    try {
+      if (USE_MOCK_DATA) {
+        // 生成该文章的所有评论（模拟数据）
+        articleComments.value = generateMockComments(comment.articleId, 10)
+      } else {
+        // 使用真实API获取文章评论
+        articleComments.value = await articleApi.getArticleComments(comment.articleId)
+      }
+    } catch (error) {
+      console.error('获取文章评论失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('获取文章评论失败', ApiStatus.error))
+      }
+    }
   }
 
   /**
    * 审核评论
    */
-  const approveComment = (status: 'approved' | 'rejected') => {
-    // 模拟审核操作
-    console.log(`审核评论 ${clickComment.value.id}，状态：${status}`)
-    // 更新评论状态
-    clickComment.value.status = status
+  const approveComment = async (status: 'approved' | 'rejected') => {
+    try {
+      if (USE_MOCK_DATA) {
+        // 模拟审核操作
+        console.log(`审核评论 ${clickComment.value.id}，状态：${status}`)
+        // 更新评论状态
+        clickComment.value.status = status
+      } else {
+        // 使用真实API
+        await articleApi.updateCommentStatus(clickComment.value.id, status)
+        // 更新本地状态
+        clickComment.value.status = status
+      }
 
-    // 更新allComments中的评论状态
-    const allIndex = allComments.value.findIndex((comment) => comment.id === clickComment.value.id)
-    if (allIndex > -1) {
-      allComments.value[allIndex].status = status
+      // 更新allComments中的评论状态
+      const allIndex = allComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (allIndex > -1) {
+        allComments.value[allIndex].status = status
+      }
+
+      // 更新pendingComments中的评论状态
+      const pendingIndex = pendingComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (pendingIndex > -1) {
+        pendingComments.value.splice(pendingIndex, 1)
+      }
+
+      // 重新筛选评论
+      filterComments()
+
+      // 更新统计数据
+      updateCommentStats()
+
+      // 关闭抽屉
+      showDrawer.value = false
+    } catch (error) {
+      console.error('审核评论失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('审核评论失败', ApiStatus.error))
+      }
     }
-
-    // 更新pendingComments中的评论状态
-    const pendingIndex = pendingComments.value.findIndex(
-      (comment) => comment.id === clickComment.value.id
-    )
-    if (pendingIndex > -1) {
-      pendingComments.value.splice(pendingIndex, 1)
-    }
-
-    // 重新筛选评论
-    filterComments()
-
-    // 更新统计数据
-    updateCommentStats()
-
-    // 关闭抽屉
-    showDrawer.value = false
   }
 
   /**
    * 删除评论
    */
-  const deleteComment = () => {
-    // 模拟删除操作
-    console.log(`删除评论 ${clickComment.value.id}`)
+  const deleteComment = async () => {
+    try {
+      if (USE_MOCK_DATA) {
+        // 模拟删除操作
+        console.log(`删除评论 ${clickComment.value.id}`)
+      } else {
+        // 使用真实API
+        await articleApi.deleteComment(clickComment.value.id)
+      }
 
-    // 从allComments中移除
-    const allIndex = allComments.value.findIndex((comment) => comment.id === clickComment.value.id)
-    if (allIndex > -1) {
-      allComments.value.splice(allIndex, 1)
+      // 从allComments中移除
+      const allIndex = allComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (allIndex > -1) {
+        allComments.value.splice(allIndex, 1)
+      }
+
+      // 从pendingComments中移除
+      const pendingIndex = pendingComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (pendingIndex > -1) {
+        pendingComments.value.splice(pendingIndex, 1)
+      }
+
+      // 重新筛选评论
+      filterComments()
+
+      // 更新统计数据
+      updateCommentStats()
+
+      // 关闭抽屉
+      showDrawer.value = false
+    } catch (error) {
+      console.error('删除评论失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('删除评论失败', ApiStatus.error))
+      }
     }
-
-    // 从pendingComments中移除
-    const pendingIndex = pendingComments.value.findIndex(
-      (comment) => comment.id === clickComment.value.id
-    )
-    if (pendingIndex > -1) {
-      pendingComments.value.splice(pendingIndex, 1)
-    }
-
-    // 重新筛选评论
-    filterComments()
-
-    // 更新统计数据
-    updateCommentStats()
-
-    // 关闭抽屉
-    showDrawer.value = false
   }
 
   /**
    * 确认拒绝评论
    */
-  const confirmReject = () => {
-    // 模拟拒绝操作，包含拒绝原因
-    console.log(`拒绝评论 ${clickComment.value.id}，原因：${replyContent.value}`)
+  const confirmReject = async () => {
+    try {
+      if (USE_MOCK_DATA) {
+        // 模拟拒绝操作，包含拒绝原因
+        console.log(`拒绝评论 ${clickComment.value.id}，原因：${replyContent.value}`)
+        // 更新评论状态和拒绝理由
+        clickComment.value.status = 'rejected'
+        clickComment.value.rejectReason = replyContent.value
+      } else {
+        // 使用真实API
+        await articleApi.updateCommentStatus(clickComment.value.id, 'rejected', replyContent.value)
+        // 更新本地状态
+        clickComment.value.status = 'rejected'
+        clickComment.value.rejectReason = replyContent.value
+      }
 
-    // 更新评论状态和拒绝理由
-    clickComment.value.status = 'rejected'
-    clickComment.value.rejectReason = replyContent.value
+      // 更新allComments中的评论状态和拒绝理由
+      const allIndex = allComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (allIndex > -1) {
+        allComments.value[allIndex].status = 'rejected'
+        allComments.value[allIndex].rejectReason = replyContent.value
+      }
 
-    // 更新allComments中的评论状态和拒绝理由
-    const allIndex = allComments.value.findIndex((comment) => comment.id === clickComment.value.id)
-    if (allIndex > -1) {
-      allComments.value[allIndex].status = 'rejected'
-      allComments.value[allIndex].rejectReason = replyContent.value
+      // 更新pendingComments中的评论状态
+      const pendingIndex = pendingComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (pendingIndex > -1) {
+        pendingComments.value.splice(pendingIndex, 1)
+      }
+
+      // 重新筛选评论
+      filterComments()
+
+      // 更新统计数据
+      updateCommentStats()
+
+      // 重置拒绝原因状态和内容
+      showRejectReason.value = false
+      replyContent.value = ''
+
+      // 关闭抽屉
+      showDrawer.value = false
+    } catch (error) {
+      console.error('拒绝评论失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('拒绝评论失败', ApiStatus.error))
+      }
     }
-
-    // 更新pendingComments中的评论状态
-    const pendingIndex = pendingComments.value.findIndex(
-      (comment) => comment.id === clickComment.value.id
-    )
-    if (pendingIndex > -1) {
-      pendingComments.value.splice(pendingIndex, 1)
-    }
-
-    // 重新筛选评论
-    filterComments()
-
-    // 更新统计数据
-    updateCommentStats()
-
-    // 重置拒绝原因状态和内容
-    showRejectReason.value = false
-    replyContent.value = ''
-
-    // 关闭抽屉
-    showDrawer.value = false
   }
 
   /**
    * 取消拒绝评论
    */
-  const cancelReject = () => {
-    // 模拟取消拒绝操作
-    console.log(`取消拒绝评论 ${clickComment.value.id}`)
+  const cancelReject = async () => {
+    try {
+      if (USE_MOCK_DATA) {
+        // 模拟取消拒绝操作
+        console.log(`取消拒绝评论 ${clickComment.value.id}`)
+      } else {
+        // 使用真实API
+        await articleApi.updateCommentStatus(clickComment.value.id, 'pending')
+      }
 
-    // 更新评论状态为待审核
-    clickComment.value.status = 'pending'
-    // 清除拒绝理由
-    delete clickComment.value.rejectReason
+      // 更新评论状态为待审核
+      clickComment.value.status = 'pending'
+      // 清除拒绝理由
+      delete clickComment.value.rejectReason
 
-    // 更新allComments中的评论状态
-    const allIndex = allComments.value.findIndex((comment) => comment.id === clickComment.value.id)
-    if (allIndex > -1) {
-      allComments.value[allIndex].status = 'pending'
-      delete allComments.value[allIndex].rejectReason
+      // 更新allComments中的评论状态
+      const allIndex = allComments.value.findIndex(
+        (comment) => comment.id === clickComment.value.id
+      )
+      if (allIndex > -1) {
+        allComments.value[allIndex].status = 'pending'
+        delete allComments.value[allIndex].rejectReason
+      }
+
+      // 将评论重新添加到pendingComments中
+      pendingComments.value.push({
+        ...clickComment.value
+      })
+
+      // 重新筛选评论
+      filterComments()
+
+      // 更新统计数据
+      updateCommentStats()
+
+      // 关闭抽屉
+      showDrawer.value = false
+    } catch (error) {
+      console.error('取消拒绝评论失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('取消拒绝评论失败', ApiStatus.error))
+      }
     }
-
-    // 将评论重新添加到pendingComments中
-    pendingComments.value.push({
-      ...clickComment.value
-    })
-
-    // 重新筛选评论
-    filterComments()
-
-    // 更新统计数据
-    updateCommentStats()
-
-    // 关闭抽屉
-    showDrawer.value = false
   }
 
   /**
@@ -809,56 +893,105 @@
   /**
    * 提交回复
    */
-  const handleSubmit = (commentId: number) => {
+  const handleSubmit = async (commentId: number) => {
     if (!replyContent.value.trim()) {
       return
     }
 
-    // 模拟提交回复
-    console.log(`回复评论 ${commentId}，内容：${replyContent.value}`)
+    try {
+      // 准备回复数据
+      const replyData: CommentCreateParams = {
+        articleId: clickComment.value.articleId,
+        content: replyContent.value,
+        parentId: commentId
+      }
 
-    // 生成新回复对象
-    const newReply: Comment = {
-      id: Date.now(),
-      articleId: clickComment.value.articleId,
-      content: replyContent.value,
-      parentId: commentId,
-      replyToUserId: null,
-      likeCount: 0,
-      status: 'approved',
-      author: '管理员',
-      timestamp: new Date().toISOString(),
-      replies: []
-    }
-
-    // 查找对应的评论并添加回复
-    const findCommentAndAddReply = (comments: Comment[]): boolean => {
-      for (const comment of comments) {
-        if (comment.id === commentId) {
-          // 找到评论，添加回复
-          if (!comment.replies) {
-            comment.replies = []
-          }
-          comment.replies.push(newReply)
-          return true
+      let newReply: Comment
+      if (USE_MOCK_DATA) {
+        // 模拟提交回复
+        console.log(`回复评论 ${commentId}，内容：${replyContent.value}`)
+        // 生成新回复对象
+        newReply = {
+          id: Date.now(),
+          articleId: clickComment.value.articleId,
+          content: replyContent.value,
+          parentId: commentId,
+          replyToUserId: null,
+          likeCount: 0,
+          status: 'approved',
+          author: '管理员',
+          timestamp: new Date().toISOString(),
+          replies: []
         }
+      } else {
+        // 使用真实API
+        const res = await articleApi.createComment(replyData)
+        newReply = res.data
+      }
 
-        // 递归查找子评论
-        if (comment.replies && comment.replies.length > 0) {
-          if (findCommentAndAddReply(comment.replies)) {
+      // 查找对应的评论并添加回复
+      const findCommentAndAddReply = (comments: Comment[]): boolean => {
+        for (const comment of comments) {
+          if (comment.id === commentId) {
+            // 找到评论，添加回复
+            if (!comment.replies) {
+              comment.replies = []
+            }
+            comment.replies.push(newReply)
             return true
           }
+
+          // 递归查找子评论
+          if (comment.replies && comment.replies.length > 0) {
+            if (findCommentAndAddReply(comment.replies)) {
+              return true
+            }
+          }
         }
+        return false
       }
-      return false
+
+      // 调用函数添加回复
+      findCommentAndAddReply(articleComments.value)
+
+      // 更新allComments中的评论
+      const updateCommentsInAll = (
+        comments: (Comment & { articleTitle: string; articleAuthor: string; color: string })[]
+      ): boolean => {
+        for (const comment of comments) {
+          if (comment.id === commentId) {
+            // 找到评论，添加回复
+            if (!comment.replies) {
+              comment.replies = []
+            }
+            comment.replies.push(newReply)
+            return true
+          }
+
+          // 递归查找子评论
+          if (comment.replies && comment.replies.length > 0) {
+            if (updateCommentsInAll(comment.replies as any)) {
+              return true
+            }
+          }
+        }
+        return false
+      }
+
+      updateCommentsInAll(allComments.value)
+
+      // 隐藏回复表单
+      showReplyForm.value = null
+      parentCommentId.value = null
+      replyContent.value = ''
+    } catch (error) {
+      console.error('提交回复失败:', error)
+      if (error instanceof HttpError) {
+        showError(error)
+      } else {
+        showError(new HttpError('提交回复失败', ApiStatus.error))
+      }
     }
-
-    findCommentAndAddReply(articleComments.value)
-
-    // 隐藏回复表单
-    showReplyForm.value = null
-    parentCommentId.value = null
-    replyContent.value = ''
   }
 
   // 初始化获取评论列表

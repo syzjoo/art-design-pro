@@ -272,14 +272,16 @@ export interface Comment {
   id: number
   articleId: number
   content: string
-  parentId: number
+  parentId?: number
   replyToUserId: number | null
   likeCount: number
-  status: 'pending' | 'approved' | 'rejected'
+  status: CommentStatus
   author: string
   timestamp: string
   replies: Comment[]
   rejectReason?: string
+  articleTitle?: string
+  articleAuthor?: string
 }
 
 /**

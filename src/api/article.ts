@@ -186,6 +186,24 @@ export const articleApi = {
   },
 
   /**
+   * 获取所有评论列表（支持分页、筛选、搜索）
+   * @param params 搜索和筛选参数
+   */
+  getAllComments: (params: {
+    page?: number
+    pageSize?: number
+    keyword?: string
+    status?: 'all' | 'pending' | 'approved' | 'rejected'
+    startTime?: string
+    endTime?: string
+  }): Promise<{ records: Comment[]; total: number; current: number; size: number }> => {
+    return api.get<{ records: Comment[]; total: number; current: number; size: number }>({
+      url: `/api/article/comment/list`,
+      params
+    })
+  },
+
+  /**
    * 创建评论
    * @param commentData 评论数据
    */
@@ -193,6 +211,33 @@ export const articleApi = {
     return api.post<BaseResponse<Comment>>({
       url: `/api/article/comment`,
       data: commentData
+    })
+  },
+
+  /**
+   * 更新评论状态（审核）
+   * @param id 评论ID
+   * @param status 状态值
+   * @param rejectReason 拒绝原因（仅当状态为rejected时需要）
+   */
+  updateCommentStatus: (
+    id: number,
+    status: 'approved' | 'rejected' | 'pending',
+    rejectReason?: string
+  ): Promise<BaseResponse<Comment>> => {
+    return api.put<BaseResponse<Comment>>({
+      url: `/api/article/comment/${id}/status`,
+      data: { status, rejectReason }
+    })
+  },
+
+  /**
+   * 删除评论
+   * @param id 评论ID
+   */
+  deleteComment: (id: number): Promise<BaseResponse<any>> => {
+    return api.del<BaseResponse<any>>({
+      url: `/api/article/comment/${id}`
     })
   }
 }
