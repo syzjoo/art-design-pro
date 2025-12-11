@@ -141,7 +141,9 @@
                 </div>
               </div>
               <div>
-                <span class="text-sm text-gray-700">{{ comment.author }}</span>
+                <span class="text-sm text-gray-700">{{
+                  comment.creator?.nickname || comment.author
+                }}</span>
               </div>
             </div>
           </div>
@@ -178,7 +180,9 @@
                     </div>
                   </div>
                   <div>
-                    <span class="text-sm text-gray-700">{{ clickComment.author }}</span>
+                    <span class="text-sm text-gray-700">{{
+                      clickComment.creator?.nickname || clickComment.author
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -280,9 +284,15 @@
                         class="size-5 mr-2.5 text-xs font-medium text-white rounded-full flex items-center justify-center"
                         :style="{ background: randomColor() }"
                       >
-                        {{ comment.author.substring(0, 1) }}
+                        {{
+                          comment.creator?.nickname || comment.author
+                            ? (comment.creator?.nickname || comment.author).substring(0, 1)
+                            : '未'
+                        }}
                       </div>
-                      <strong class="block text-sm font-medium">{{ comment.author }}</strong>
+                      <strong class="block text-sm font-medium">{{
+                        comment.creator?.nickname || comment.author || '未知用户'
+                      }}</strong>
                     </div>
                     <span class="block mt-2.5 text-sm text-g-700">{{ comment.content }}</span>
                     <div class="flex items-center mt-2.5">
@@ -335,9 +345,11 @@
                             class="size-5 mr-2.5 text-xs font-medium text-white rounded-full flex items-center justify-center"
                             :style="{ background: randomColor() }"
                           >
-                            {{ reply.author.substring(0, 1) }}
+                            {{ reply.author ? reply.author.substring(0, 1) : '未' }}
                           </div>
-                          <strong class="block text-sm font-medium">{{ reply.author }}</strong>
+                          <strong class="block text-sm font-medium">{{
+                            reply.author || '未知用户'
+                          }}</strong>
                         </div>
                         <span class="block mt-2.5 text-sm text-g-700">{{ reply.content }}</span>
                         <div class="flex items-center mt-2.5">
@@ -371,16 +383,14 @@
   import { ApiStatus } from '@/utils/http/status'
   import type { ArticleCommentStats, Comment, CommentCreateParams } from '@/types/api/article'
   import AppConfig from '@/config'
-  // 导入模拟数据
-  import { mockArticleCommentStatsResponse, generateMockComments } from '@/mock/temp/commentDetail'
-  // 是否使用模拟数据（可以根据环境变量配置）
-  const USE_MOCK_DATA =
-    import.meta.env.MODE === 'development' && import.meta.env.VITE_USE_MOCK_DATA === 'true'
 
   // 格式化日期
   const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleString()
+    if (!timestamp) return ''
+    // 处理YYYY-MM-DD HH:mm:ss格式，将空格替换为'T'以确保正确解析
+    const formattedTimestamp = timestamp.replace(/\s+/g, 'T')
+    const date = new Date(formattedTimestamp)
+    return isNaN(date.getTime()) ? '' : date.toLocaleString()
   }
 
   // 随机生成颜色
@@ -401,7 +411,6 @@
   const COLOR_LIST = ['#D8F8FF', '#FDDFD9', '#FCE6F0', '#D3F8F0', '#FFEABC', '#F5E1FF', '#E1E6FE']
 
   const showDrawer = ref(false)
-  const articleCommentStats = ref<ArticleCommentStats[]>([])
   const pendingComments = ref<
     (Comment & { articleTitle: string; articleAuthor: string; color: string })[]
   >([])
@@ -457,67 +466,34 @@
    */
   const fetchComments = async () => {
     try {
-      let commentsList
+      // 使用真实API
+      // 先获取文章评论统计数据，包含文章标题和作者信息
+      const statsRes = await articleApi.getArticleCommentStats()
+      const articleStatsMap = new Map<number, ArticleCommentStats>()
+      statsRes.records.forEach((stat) => {
+        articleStatsMap.set(stat.articleId, stat)
+      })
 
-      if (USE_MOCK_DATA) {
-        // 使用模拟数据
-        const res = mockArticleCommentStatsResponse()
-        articleCommentStats.value = res.records.map((item, index) => ({
-          ...item,
+      // 获取所有评论 - 注意：这里应该获取所有评论，而不是只获取当前状态的评论
+      // 然后在前端进行筛选，这样切换视图时就不需要重新请求API
+      const commentsRes = await articleApi.getAllComments({
+        page: 1,
+        pageSize: 100, // 设置一个较大的值以获取所有评论
+        status: 'all', // 获取所有状态的评论
+        keyword: '' // 不使用搜索关键词
+        // 不传递startTime和endTime，使用默认值undefined
+      })
+
+      // 为每条评论添加文章信息和颜色
+      const commentsList = commentsRes.records.map((comment, index) => {
+        const articleStat = articleStatsMap.get(comment.articleId)
+        return {
+          ...comment,
+          articleTitle: articleStat?.articleTitle || '未知文章',
+          articleAuthor: articleStat?.articleAuthor || '未知作者',
           color: COLOR_LIST[index % COLOR_LIST.length]
-        }))
-
-        // 提取所有评论
-        const allCommentsList: (Comment & {
-          articleTitle: string
-          articleAuthor: string
-          color: string
-        })[] = []
-        articleCommentStats.value.forEach((article) => {
-          // 生成该文章的所有评论（模拟数据）
-          const comments = generateMockComments(article.articleId, 10)
-          // 添加文章信息和颜色
-          comments.forEach((comment) => {
-            allCommentsList.push({
-              ...comment,
-              articleTitle: article.articleTitle,
-              articleAuthor: article.articleAuthor,
-              color: article.color || COLOR_LIST[0]
-            })
-          })
-        })
-
-        commentsList = allCommentsList
-      } else {
-        // 使用真实API
-        // 先获取文章评论统计数据，包含文章标题和作者信息
-        const statsRes = await articleApi.getArticleCommentStats()
-        const articleStatsMap = new Map<number, ArticleCommentStats>()
-        statsRes.records.forEach((stat) => {
-          articleStatsMap.set(stat.articleId, stat)
-        })
-
-        // 获取所有评论
-        const commentsRes = await articleApi.getAllComments({
-          page: 1,
-          pageSize: 100, // 设置一个较大的值以获取所有评论
-          status: activeView.value,
-          keyword: searchKeyword.value,
-          startTime: dateRange.value?.[0],
-          endTime: dateRange.value?.[1]
-        })
-
-        // 为每条评论添加文章信息和颜色
-        commentsList = commentsRes.records.map((comment, index) => {
-          const articleStat = articleStatsMap.get(comment.articleId)
-          return {
-            ...comment,
-            articleTitle: articleStat?.articleTitle || '未知文章',
-            articleAuthor: articleStat?.articleAuthor || '未知作者',
-            color: COLOR_LIST[index % COLOR_LIST.length]
-          }
-        })
-      }
+        }
+      })
 
       allComments.value = commentsList
       pendingComments.value = commentsList.filter((comment) => comment.status === 'pending')
@@ -617,13 +593,9 @@
     replyContent.value = ''
 
     try {
-      if (USE_MOCK_DATA) {
-        // 生成该文章的所有评论（模拟数据）
-        articleComments.value = generateMockComments(comment.articleId, 10)
-      } else {
-        // 使用真实API获取文章评论
-        articleComments.value = await articleApi.getArticleComments(comment.articleId)
-      }
+      // 使用真实API获取文章评论
+      const response = await articleApi.getArticleComments(comment.articleId)
+      articleComments.value = response.records || []
     } catch (error) {
       console.error('获取文章评论失败:', error)
       if (error instanceof HttpError) {
@@ -639,17 +611,10 @@
    */
   const approveComment = async (status: 'approved' | 'rejected') => {
     try {
-      if (USE_MOCK_DATA) {
-        // 模拟审核操作
-        console.log(`审核评论 ${clickComment.value.id}，状态：${status}`)
-        // 更新评论状态
-        clickComment.value.status = status
-      } else {
-        // 使用真实API
-        await articleApi.updateCommentStatus(clickComment.value.id, status)
-        // 更新本地状态
-        clickComment.value.status = status
-      }
+      // 使用真实API
+      await articleApi.updateCommentStatus(clickComment.value.id, status)
+      // 更新本地状态
+      clickComment.value.status = status
 
       // 更新allComments中的评论状态
       const allIndex = allComments.value.findIndex(
@@ -690,13 +655,8 @@
    */
   const deleteComment = async () => {
     try {
-      if (USE_MOCK_DATA) {
-        // 模拟删除操作
-        console.log(`删除评论 ${clickComment.value.id}`)
-      } else {
-        // 使用真实API
-        await articleApi.deleteComment(clickComment.value.id)
-      }
+      // 使用真实API
+      await articleApi.deleteComment(clickComment.value.id)
 
       // 从allComments中移除
       const allIndex = allComments.value.findIndex(
@@ -737,19 +697,11 @@
    */
   const confirmReject = async () => {
     try {
-      if (USE_MOCK_DATA) {
-        // 模拟拒绝操作，包含拒绝原因
-        console.log(`拒绝评论 ${clickComment.value.id}，原因：${replyContent.value}`)
-        // 更新评论状态和拒绝理由
-        clickComment.value.status = 'rejected'
-        clickComment.value.rejectReason = replyContent.value
-      } else {
-        // 使用真实API
-        await articleApi.updateCommentStatus(clickComment.value.id, 'rejected', replyContent.value)
-        // 更新本地状态
-        clickComment.value.status = 'rejected'
-        clickComment.value.rejectReason = replyContent.value
-      }
+      // 使用真实API
+      await articleApi.updateCommentStatus(clickComment.value.id, 'rejected', replyContent.value)
+      // 更新本地状态
+      clickComment.value.status = 'rejected'
+      clickComment.value.rejectReason = replyContent.value
 
       // 更新allComments中的评论状态和拒绝理由
       const allIndex = allComments.value.findIndex(
@@ -795,13 +747,8 @@
    */
   const cancelReject = async () => {
     try {
-      if (USE_MOCK_DATA) {
-        // 模拟取消拒绝操作
-        console.log(`取消拒绝评论 ${clickComment.value.id}`)
-      } else {
-        // 使用真实API
-        await articleApi.updateCommentStatus(clickComment.value.id, 'pending')
-      }
+      // 使用真实API
+      await articleApi.updateCommentStatus(clickComment.value.id, 'pending')
 
       // 更新评论状态为待审核
       clickComment.value.status = 'pending'
@@ -906,28 +853,9 @@
         parentId: commentId
       }
 
-      let newReply: Comment
-      if (USE_MOCK_DATA) {
-        // 模拟提交回复
-        console.log(`回复评论 ${commentId}，内容：${replyContent.value}`)
-        // 生成新回复对象
-        newReply = {
-          id: Date.now(),
-          articleId: clickComment.value.articleId,
-          content: replyContent.value,
-          parentId: commentId,
-          replyToUserId: null,
-          likeCount: 0,
-          status: 'approved',
-          author: '管理员',
-          timestamp: new Date().toISOString(),
-          replies: []
-        }
-      } else {
-        // 使用真实API
-        const res = await articleApi.createComment(replyData)
-        newReply = res.data
-      }
+      // 使用真实API
+      const res = await articleApi.createComment(replyData)
+      const newReply = res.data
 
       // 查找对应的评论并添加回复
       const findCommentAndAddReply = (comments: Comment[]): boolean => {

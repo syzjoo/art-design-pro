@@ -19,7 +19,8 @@ import type {
   ArticleListResponse,
   Comment,
   CommentCreateParams,
-  ArticleCommentStats
+  ArticleCommentStats,
+  ArticleCommentListResponse
 } from '../types/api/article'
 import type { BaseResponse } from '../types/common/response'
 
@@ -179,8 +180,8 @@ export const articleApi = {
    * 获取文章评论列表
    * @param articleId 文章ID
    */
-  getArticleComments: (articleId: number): Promise<Comment[]> => {
-    return api.get<Comment[]>({
+  getArticleComments: (articleId: number): Promise<ArticleCommentListResponse> => {
+    return api.get<ArticleCommentListResponse>({
       url: `/api/article/${articleId}/comments`
     })
   },

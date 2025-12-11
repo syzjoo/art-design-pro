@@ -181,6 +181,16 @@ export interface ArticleListResponse {
 }
 
 /**
+ * 文章评论列表响应
+ */
+export interface ArticleCommentListResponse {
+  records: Comment[]
+  total: number
+  current: number
+  size: number
+}
+
+/**
  * 分类管理相关类型
  */
 export interface CategoryQuery {
@@ -278,10 +288,15 @@ export interface Comment {
   status: CommentStatus
   author: string
   timestamp: string
-  replies: Comment[]
+  replies?: Comment[]
   rejectReason?: string
   articleTitle?: string
   articleAuthor?: string
+  creator?: {
+    id: number
+    nickname: string
+    username: string
+  }
 }
 
 /**

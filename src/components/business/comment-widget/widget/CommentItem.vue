@@ -6,9 +6,15 @@
           class="size-5 mr-2.5 text-xs font-medium text-white rounded-full flex-cc"
           :style="{ background: randomColor() }"
         >
-          {{ comment.author.substring(0, 1) }}
+          {{
+            comment.creator?.nickname || comment.author
+              ? (comment.creator?.nickname || comment.author).substring(0, 1)
+              : '未'
+          }}
         </div>
-        <strong class="block text-sm font-medium">{{ comment.author }}</strong>
+        <strong class="block text-sm font-medium">{{
+          comment.creator?.nickname || comment.author || '匿名用户'
+        }}</strong>
       </div>
       <span class="block mt-2.5 text-sm text-g-700">{{ comment.content }}</span>
       <div class="flex-c mt-2.5">
@@ -22,9 +28,9 @@
       </div>
     </div>
 
-    <ul class="pl-7 border-l-2 border-gray-100" v-if="comment.replies.length > 0">
+    <ul class="pl-7 border-l-2 border-gray-100" v-if="(comment.replies || []).length > 0">
       <CommentItem
-        v-for="reply in comment.replies"
+        v-for="reply in comment.replies || []"
         :key="reply.id"
         :comment="reply"
         :show-reply-form="showReplyForm"
@@ -88,7 +94,11 @@
   }
 
   const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp)
+    if (!timestamp) return ''
+    // 处理不同格式的时间戳，确保能正确解析
+    const formattedTimestamp = timestamp.replace(/\s+/g, 'T')
+    const date = new Date(formattedTimestamp)
+    if (isNaN(date.getTime())) return timestamp
     return date.toLocaleString()
   }
 

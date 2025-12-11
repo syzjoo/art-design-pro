@@ -38,10 +38,6 @@
   import { articleApi } from '@/api/article'
   import type { Comment, CommentCreateParams } from '@/types/api/article'
   import { ElMessage } from 'element-plus'
-  // 导入模拟数据
-  import { generateMockComments } from '@/mock/temp/commentDetail'
-  // 是否使用模拟数据（可以根据环境变量配置）
-  const USE_MOCK_DATA = import.meta.env.MODE === 'development' || true
 
   const props = defineProps<{
     articleId?: number
@@ -57,20 +53,25 @@
 
   // 获取文章评论列表
   const fetchComments = async () => {
-    if (!props.articleId) return
+    if (!props.articleId) {
+      console.log('articleId is null or undefined')
+      return
+    }
 
     try {
-      if (USE_MOCK_DATA) {
-        // 使用模拟数据
-        const mockComments = generateMockComments(props.articleId, 5)
-        comments.value = mockComments.filter((comment) => comment.status === 'approved')
-        console.log('使用模拟评论数据:', comments.value)
-      } else {
-        // 使用真实API
-        const commentList = await articleApi.getArticleComments(props.articleId)
-        // 过滤出已通过的评论
-        comments.value = commentList.filter((comment) => comment.status === 'approved')
-      }
+      console.log('开始获取文章评论，articleId:', props.articleId)
+      // 使用真实API
+      const response = await articleApi.getArticleComments(props.articleId)
+      console.log('API返回结果:', response)
+      const commentList = response.records || []
+      console.log('评论列表:', commentList)
+      console.log('评论数量:', commentList.length)
+      // 过滤出已通过的评论
+      const approvedComments = commentList.filter(
+        (comment: Comment) => comment.status === 'approved'
+      )
+      console.log('已通过评论数量:', approvedComments.length)
+      comments.value = approvedComments
     } catch (error) {
       console.error('获取评论失败:', error)
       ElMessage.error('获取评论失败')
@@ -90,33 +91,14 @@
         content: newComment.value.content.trim()
       }
 
-      if (USE_MOCK_DATA) {
-        // 使用模拟数据
-        const mockComment: Comment = {
-          id: Date.now(),
-          articleId: props.articleId!,
-          content: commentData.content,
-          parentId: 0,
-          replyToUserId: null,
-          likeCount: 0,
-          status: 'approved',
-          author: '匿名用户',
-          timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          replies: []
-        }
-        comments.value.push(mockComment)
+      // 使用真实API
+      const response = await articleApi.createComment(commentData)
+
+      // 如果创建成功，将评论添加到列表
+      if (response.data) {
+        comments.value.push(response.data)
         newComment.value.content = ''
         ElMessage.success('评论发布成功')
-      } else {
-        // 使用真实API
-        const response = await articleApi.createComment(commentData)
-
-        // 如果创建成功，将评论添加到列表
-        if (response.data) {
-          comments.value.push(response.data)
-          newComment.value.content = ''
-          ElMessage.success('评论发布成功')
-        }
       }
     } catch (error) {
       console.error('发布评论失败:', error)
@@ -137,41 +119,20 @@
         parentId: commentId
       }
 
-      if (USE_MOCK_DATA) {
-        // 使用模拟数据
-        const mockReply: Comment = {
-          id: Date.now(),
-          articleId: props.articleId!,
-          content: commentData.content,
-          parentId: commentId,
-          replyToUserId: null,
-          likeCount: 0,
-          status: 'approved',
-          author: '匿名用户',
-          timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
-          replies: []
-        }
+      // 使用真实API
+      const response = await articleApi.createComment(commentData)
 
+      if (response.data) {
         // 查找父评论并添加回复
         const parentComment = findComment(comments.value, commentId)
         if (parentComment) {
-          parentComment.replies.push(mockReply)
+          if (!parentComment.replies) {
+            parentComment.replies = []
+          }
+          parentComment.replies.push(response.data)
         }
         showReplyForm.value = null
         ElMessage.success('回复发布成功')
-      } else {
-        // 使用真实API
-        const response = await articleApi.createComment(commentData)
-
-        if (response.data) {
-          // 查找父评论并添加回复
-          const parentComment = findComment(comments.value, commentId)
-          if (parentComment) {
-            parentComment.replies.push(response.data)
-          }
-          showReplyForm.value = null
-          ElMessage.success('回复发布成功')
-        }
       }
     } catch (error) {
       console.error('发布回复失败:', error)
@@ -188,7 +149,7 @@
       if (comment.id === commentId) {
         return comment
       }
-      const found = findComment(comment.replies, commentId)
+      const found = findComment(comment.replies || [], commentId)
       if (found) {
         return found
       }
