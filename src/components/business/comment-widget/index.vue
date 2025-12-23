@@ -2,12 +2,12 @@
   <div>
     <ElForm @submit.prevent="addComment" class="w-full mx-auto mb-10">
       <ElFormItem prop="content">
-        <ElInput
+        <ArtWangEditor
           v-model="newComment.content"
-          placeholder="简单说两句..."
-          type="textarea"
-          :rows="5"
-          clearable
+          :height="'200px'"
+          :placeholder="'简单说两句...'"
+          :toolbarKeys="toolbarKeys"
+          :mode="'simple'"
         />
       </ElFormItem>
       <ElFormItem>
@@ -38,6 +38,7 @@
   import { articleApi } from '@/api/article'
   import type { Comment, CommentCreateParams } from '@/types/api/article'
   import { ElMessage } from 'element-plus'
+  import ArtWangEditor from '@/components/core/forms/art-wang-editor/index.vue'
 
   const props = defineProps<{
     articleId?: number
@@ -45,13 +46,17 @@
 
   const comments = ref<Comment[]>([])
 
-  const newComment = ref<Partial<CommentCreateParams>>({
+  const newComment = ref<CommentCreateParams>({
+    articleId: props.articleId || 0,
     content: ''
   })
 
   const showReplyForm = ref<number | null>(null)
 
   const isSubmitting = ref(false)
+
+  // 配置简易工具栏 - 只保留图片和表情包功能
+  const toolbarKeys = ref(['emotion', 'uploadImage'])
 
   // 获取文章评论列表
   const fetchComments = async () => {
@@ -125,7 +130,7 @@
     }
   }
 
-  const addReply = async (commentId: number, replyAuthor: string, replyContent: string) => {
+  const addReply = async (commentId: number, _replyAuthor: string, replyContent: string) => {
     if (!replyContent?.trim() || !props.articleId) {
       ElMessage.warning('请填写回复内容')
       return

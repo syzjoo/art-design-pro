@@ -16,7 +16,7 @@
           comment.creator?.nickname || comment.author || '匿名用户'
         }}</strong>
       </div>
-      <span class="block mt-2.5 text-sm text-g-700">{{ comment.content }}</span>
+      <span class="block mt-2.5 text-sm text-g-700" v-html="comment.content"></span>
       <!-- 审核状态提示 -->
       <div v-if="comment.status !== 'approved'" class="mt-2.5">
         <ElTag type="info" size="small" effect="light">
@@ -52,12 +52,12 @@
 
     <ElForm v-if="showReplyForm === comment.id" @submit.prevent="handleSubmit" class="mt-4">
       <ElFormItem prop="content">
-        <ElInput
+        <ArtWangEditor
           v-model="replyContent"
-          placeholder="你的回复..."
-          type="textarea"
-          :rows="3"
-          clearable
+          :height="'150px'"
+          :placeholder="'你的回复...'"
+          :toolbarKeys="toolbarKeys"
+          :mode="'simple'"
         />
       </ElFormItem>
       <ElFormItem>
@@ -76,6 +76,7 @@
   import AppConfig from '@/config'
   import { ref } from 'vue'
   import type { Comment } from '@/types/api/article'
+  import ArtWangEditor from '@/components/core/forms/art-wang-editor/index.vue'
 
   const props = defineProps<{
     comment: Comment
@@ -89,6 +90,9 @@
   }>()
 
   const replyContent = ref('')
+
+  // 配置简易工具栏 - 只保留图片和表情包功能
+  const toolbarKeys = ref(['emotion', 'uploadImage'])
 
   const toggleReply = (commentId: number) => {
     emit('toggle-reply', commentId)
