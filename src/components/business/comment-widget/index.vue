@@ -12,7 +12,7 @@
       </ElFormItem>
       <ElFormItem>
         <div class="flex justify-end w-full">
-          <ElButton type="primary" @click="addComment"> 发布 </ElButton>
+          <ElButton type="primary" @click="addComment" :loading="isSubmitting"> 发布 </ElButton>
         </div>
       </ElFormItem>
     </ElForm>
@@ -24,9 +24,9 @@
         :key="comment.id"
         :comment="comment"
         :show-reply-form="showReplyForm"
+        :is-submitting="isSubmitting"
         @toggle-reply="toggleReply"
         @add-reply="addReply"
-        class="pb-2.5 mb-5 border-b border-g-400"
       />
     </ul>
   </div>
@@ -51,6 +51,8 @@
 
   const showReplyForm = ref<number | null>(null)
 
+  const isSubmitting = ref(false)
+
   // 获取文章评论列表
   const fetchComments = async () => {
     if (!props.articleId) {
@@ -66,12 +68,8 @@
       const commentList = response.records || []
       console.log('评论列表:', commentList)
       console.log('评论数量:', commentList.length)
-      // 过滤出已通过的评论
-      const approvedComments = commentList.filter(
-        (comment: Comment) => comment.status === 'approved'
-      )
-      console.log('已通过评论数量:', approvedComments.length)
-      comments.value = approvedComments
+      // 取消过滤，由后端控制评论可见性
+      comments.value = commentList
     } catch (error) {
       console.error('获取评论失败:', error)
       ElMessage.error('获取评论失败')
@@ -85,24 +83,45 @@
       return
     }
 
+    isSubmitting.value = true
     try {
+      const commentContent = newComment.value.content.trim()
       const commentData: CommentCreateParams = {
         articleId: props.articleId,
-        content: newComment.value.content.trim()
+        content: commentContent
       }
+
+      // 创建临时评论对象，提供即时反馈
+      const tempComment: Partial<Comment> = {
+        id: Date.now(), // 使用时间戳作为临时ID
+        articleId: props.articleId,
+        content: commentContent,
+        timestamp: new Date().toISOString(),
+        status: 'pending', // 默认显示为审核中
+        likeCount: 0,
+        replyToUserId: null,
+        author: '我',
+        creator: { id: 0, username: '我', nickname: '我' },
+        replies: []
+      }
+
+      // 立即将临时评论添加到列表
+      comments.value.push(tempComment as Comment)
+      newComment.value.content = ''
 
       // 使用真实API
       const response = await articleApi.createComment(commentData)
 
-      // 如果创建成功，将评论添加到列表
+      // 如果创建成功，重新获取评论列表以保证数据一致性
       if (response.data) {
-        comments.value.push(response.data)
-        newComment.value.content = ''
+        await fetchComments()
         ElMessage.success('评论发布成功')
       }
     } catch (error) {
       console.error('发布评论失败:', error)
       ElMessage.error('发布评论失败')
+    } finally {
+      isSubmitting.value = false
     }
   }
 
@@ -112,31 +131,57 @@
       return
     }
 
+    isSubmitting.value = true
     try {
+      const trimmedContent = replyContent.trim()
       const commentData: CommentCreateParams = {
         articleId: props.articleId,
-        content: replyContent.trim(),
+        content: trimmedContent,
         parentId: commentId
       }
 
+      // 创建临时回复对象，提供即时反馈
+      const tempReply: Partial<Comment> = {
+        id: Date.now(), // 使用时间戳作为临时ID
+        articleId: props.articleId,
+        content: trimmedContent,
+        timestamp: new Date().toISOString(),
+        status: 'pending', // 默认显示为审核中
+        parentId: commentId,
+        likeCount: 0,
+        replyToUserId: 0, // 临时设置为0
+        author: '我',
+        creator: { id: 0, username: '我', nickname: '我' },
+        replies: []
+      }
+
+      // 找到父评论并添加临时回复
+      const parentComment = findComment(comments.value, commentId)
+      if (parentComment) {
+        if (!parentComment.replies) {
+          parentComment.replies = []
+        }
+        parentComment.replies.push(tempReply as Comment)
+      }
+
+      // 关闭回复表单
+      showReplyForm.value = null
+
       // 使用真实API
-      const response = await articleApi.createComment(commentData)
+      const response = await articleApi.createCommentReply(commentData)
 
       if (response.data) {
-        // 查找父评论并添加回复
-        const parentComment = findComment(comments.value, commentId)
-        if (parentComment) {
-          if (!parentComment.replies) {
-            parentComment.replies = []
-          }
-          parentComment.replies.push(response.data)
-        }
-        showReplyForm.value = null
+        // 回复成功后，重新获取评论列表以保证数据一致性
+        await fetchComments()
         ElMessage.success('回复发布成功')
       }
     } catch (error) {
       console.error('发布回复失败:', error)
       ElMessage.error('发布回复失败')
+      // 重新获取评论列表，清除临时回复
+      await fetchComments()
+    } finally {
+      isSubmitting.value = false
     }
   }
 

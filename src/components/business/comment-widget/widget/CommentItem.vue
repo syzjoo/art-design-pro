@@ -1,5 +1,5 @@
 <template>
-  <li>
+  <li class="py-4">
     <div>
       <div class="flex-c">
         <div
@@ -17,6 +17,15 @@
         }}</strong>
       </div>
       <span class="block mt-2.5 text-sm text-g-700">{{ comment.content }}</span>
+      <!-- 审核状态提示 -->
+      <div v-if="comment.status !== 'approved'" class="mt-2.5">
+        <ElTag type="info" size="small" effect="light">
+          {{ comment.status === 'pending' ? '审核中' : '已拒绝' }}
+        </ElTag>
+        <span v-if="comment.status === 'pending'" class="ml-2 text-xs text-g-600">
+          评论已提交，审核通过后所有人可见
+        </span>
+      </div>
       <div class="flex-c mt-2.5">
         <span class="text-xs text-g-700">{{ formatDate(comment.timestamp) }}</span>
         <div
@@ -28,15 +37,16 @@
       </div>
     </div>
 
-    <ul class="pl-7 border-l-2 border-gray-100" v-if="(comment.replies || []).length > 0">
+    <ul class="pl-4 space-y-4" v-if="(comment.replies || []).length > 0">
       <CommentItem
         v-for="reply in comment.replies || []"
         :key="reply.id"
         :comment="reply"
         :show-reply-form="showReplyForm"
+        :is-submitting="props.isSubmitting"
         @toggle-reply="toggleReply"
         @add-reply="addReply"
-        class="mt-5 bg-gray-50 p-3 rounded-lg"
+        class="mt-0"
       />
     </ul>
 
@@ -52,8 +62,10 @@
       </ElFormItem>
       <ElFormItem>
         <div class="flex justify-end gap-2 w-full">
-          <ElButton @click="toggleReply(comment.id)">取消</ElButton>
-          <ElButton type="primary" @click="handleSubmit">发布</ElButton>
+          <ElButton @click="toggleReply(comment.id)" :disabled="props.isSubmitting">取消</ElButton>
+          <ElButton type="primary" @click="handleSubmit" :loading="props.isSubmitting"
+            >发布</ElButton
+          >
         </div>
       </ElFormItem>
     </ElForm>
@@ -68,6 +80,7 @@
   const props = defineProps<{
     comment: Comment
     showReplyForm: number | null
+    isSubmitting?: boolean
   }>()
 
   const emit = defineEmits<{

@@ -216,6 +216,17 @@ export const articleApi = {
   },
 
   /**
+   * 创建评论回复
+   * @param commentData 评论回复数据
+   */
+  createCommentReply: (commentData: CommentCreateParams): Promise<BaseResponse<Comment>> => {
+    return api.post<BaseResponse<Comment>>({
+      url: `/api/article/comment/reply`,
+      data: commentData
+    })
+  },
+
+  /**
    * 更新评论状态（审核）
    * @param id 评论ID
    * @param status 状态值
