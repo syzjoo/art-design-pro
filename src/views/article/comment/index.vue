@@ -129,7 +129,7 @@
               }}
             </span>
           </div>
-          <p class="mt-2 text-sm text-gray-800 line-clamp-2">{{ comment.content }}</p>
+          <p class="mt-2 text-sm text-gray-800 line-clamp-2" v-html="comment.content"></p>
           <div class="absolute bottom-4 left-0 px-4 flex-col items-end w-full">
             <!-- 文章名称显示在评论人上面，前面加—— -->
             <p class="text-xs text-g-600 mb-1">—— {{ comment.articleTitle }}</p>
@@ -162,7 +162,7 @@
               <p class="text-g-500 text-xs truncate">{{
                 new Date(clickComment.timestamp).toLocaleDateString()
               }}</p>
-              <p class="mt-2 text-sm text-gray-800 line-clamp-2">{{ clickComment.content }}</p>
+              <p class="mt-2 text-sm text-gray-800 line-clamp-2" v-html="clickComment.content"></p>
               <div class="absolute bottom-4 left-0 px-4 flex-col items-end w-full">
                 <!-- 文章名称显示在评论人上面，前面加——，并添加链接 -->
                 <a
@@ -294,7 +294,7 @@
                         comment.creator?.nickname || comment.author || '未知用户'
                       }}</strong>
                     </div>
-                    <span class="block mt-2.5 text-sm text-g-700">{{ comment.content }}</span>
+                    <span class="block mt-2.5 text-sm text-g-700" v-html="comment.content"></span>
                     <div class="flex items-center mt-2.5">
                       <span class="text-xs text-g-700">{{ formatDate(comment.timestamp) }}</span>
                       <div
@@ -351,7 +351,7 @@
                             reply.author || '未知用户'
                           }}</strong>
                         </div>
-                        <span class="block mt-2.5 text-sm text-g-700">{{ reply.content }}</span>
+                        <span class="block mt-2.5 text-sm text-g-700" v-html="reply.content"></span>
                         <div class="flex items-center mt-2.5">
                           <span class="text-xs text-g-700">{{ formatDate(reply.timestamp) }}</span>
                           <div
