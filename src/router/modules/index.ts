@@ -4,6 +4,7 @@ import { systemRoutes } from './system'
 import { resultRoutes } from './result'
 import { exceptionRoutes } from './exception'
 import { articleRoutes } from './article'
+import { itemRoutes } from './item'
 
 /**
  * 导出所有模块化路由
@@ -12,6 +13,7 @@ export const routeModules: AppRouteRecord[] = [
   dashboardRoutes,
   systemRoutes,
   articleRoutes,
+  itemRoutes,
   resultRoutes,
   exceptionRoutes
 ]

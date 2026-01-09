@@ -45,10 +45,10 @@
   defineOptions({ name: 'ArtDonutChartCard' })
 
   interface Props {
-    /** 数值 */
-    value: number
     /** 标题 */
     title: string
+    /** 数值 */
+    value: number
     /** 百分比 */
     percentage: number
     /** 百分比标签 */
@@ -61,16 +61,20 @@
     height?: number
     /** 颜色 */
     color?: string
+    /** 颜色数组 */
+    colors?: string[]
     /** 半径 */
     radius?: [string, string]
     /** 数据 */
-    data: [number, number]
+    data: number[]
   }
 
   const props = withDefaults(defineProps<Props>(), {
     height: 9,
     radius: () => ['70%', '90%'],
-    data: () => [0, 0]
+    data: () => [0, 0],
+    colors: () => [],
+    value: 0
   })
 
   const formatNumber = (num: number) => {
@@ -94,6 +98,11 @@
     ],
     generateOptions: (): EChartsOption => {
       const computedColor = props.color || useChartOps().themeColor
+      const defaultColors = [computedColor, '#e6e8f7', '#67C23A', '#E6A23C', '#F56C6C']
+      const usedColors = props.colors.length > 0 ? props.colors : defaultColors
+
+      // 处理数据点名称
+      const dataPointNames = [props.currentValue, props.previousValue]
 
       return {
         series: [
@@ -104,18 +113,11 @@
             label: {
               show: false
             },
-            data: [
-              {
-                value: props.data[0],
-                name: props.currentValue,
-                itemStyle: { color: computedColor }
-              },
-              {
-                value: props.data[1],
-                name: props.previousValue,
-                itemStyle: { color: '#e6e8f7' }
-              }
-            ]
+            data: props.data.map((value, index) => ({
+              value,
+              name: dataPointNames[index] || `数据点 ${index + 1}`,
+              itemStyle: { color: usedColors[index % usedColors.length] }
+            }))
           }
         ]
       }
