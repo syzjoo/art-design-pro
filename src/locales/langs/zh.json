@@ -248,13 +248,6 @@
       "role": "角色管理",
       "userCenter": "个人中心",
       "menu": "菜单管理"
-    },
-    "item": {
-      "title": "项目管理",
-      "list": "项目列表",
-      "create": "创建项目",
-      "detail": "项目详情",
-      "todo": "每日任务"
     }
   },
   "table": {
