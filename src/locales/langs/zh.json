@@ -248,6 +248,14 @@
       "role": "角色管理",
       "userCenter": "个人中心",
       "menu": "菜单管理"
+    },
+    "project": {
+      "title": "项目管理",
+      "statistics": "项目统计",
+      "list": "项目列表",
+      "detail": "项目详情",
+      "task": "任务管理",
+      "finance": "财务管理"
     }
   },
   "table": {

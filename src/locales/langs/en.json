@@ -248,6 +248,14 @@
       "role": "Role Manage",
       "userCenter": "User Center",
       "menu": "Menu Manage"
+    },
+    "project": {
+      "title": "Project Management",
+      "statistics": "Statistics",
+      "list": "Project List",
+      "detail": "Project Detail",
+      "task": "Task Management",
+      "finance": "Finance Management"
     }
   },
   "table": {

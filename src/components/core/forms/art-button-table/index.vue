@@ -17,7 +17,17 @@
 
   interface Props {
     /** 按钮类型 */
-    type?: 'add' | 'edit' | 'delete' | 'more' | 'view' | 'top' | 'hot' | 'notTop' | 'notHot'
+    type?:
+      | 'add'
+      | 'edit'
+      | 'delete'
+      | 'more'
+      | 'view'
+      | 'top'
+      | 'hot'
+      | 'notTop'
+      | 'notHot'
+      | 'Check'
     /** 按钮图标 */
     icon?: string
     /** 按钮样式类 */
@@ -44,7 +54,8 @@
     top: { icon: 'ri:thumb-up-line', class: 'bg-success/12 text-success' },
     hot: { icon: 'ri:fire-line', class: 'bg-warning/12 text-warning' },
     notHot: { icon: 'ri:fire-line', class: 'bg-warning/12 text-warning' },
-    notTop: { icon: 'ri:thumb-up-line', class: 'bg-success/12 text-success' }
+    notTop: { icon: 'ri:thumb-up-line', class: 'bg-success/12 text-success' },
+    Check: { icon: 'ri:check-circle-line', class: 'bg-success/12 text-success' }
   } as const
 
   // 获取图标内容
