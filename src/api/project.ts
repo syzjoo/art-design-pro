@@ -20,7 +20,7 @@ import type {
   PaginationResponse,
   ApiResponse
 } from '@/types/api/project'
-import { projectStorage, taskStorage, expenseStorage } from '@/utils/storage'
+import { projectStorage, taskStorage, expenseStorage } from '@/utils/storage/storage-project'
 // 从本地存储读取数据，如果没有则使用默认数据
 const loadProjects = (): ProjectItem[] => {
   const storedProjects = projectStorage.getProjects()
