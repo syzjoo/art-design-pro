@@ -53,6 +53,7 @@
           stripe
           border
           ref="tableRef"
+          style="transition: opacity 0.3s ease"
         >
           <template #status="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -403,11 +404,16 @@
       }
 
       const response = await getTaskList(params)
-      taskList.value = response.data.data
-      pagination.total = response.data.total
+
+      if (response.code === 200) {
+        taskList.value = response.data.data
+        pagination.total = response.data.total
+      } else {
+        ElMessage.error(`获取任务列表失败: ${response.message}`)
+      }
     } catch (error) {
-      ElMessage.error('获取任务列表失败')
       console.error('获取任务列表失败:', error)
+      ElMessage.error('获取任务列表失败，请稍后重试')
     } finally {
       loading.value = false
     }

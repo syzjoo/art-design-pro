@@ -6,9 +6,11 @@
 
 import type {
   ProjectItem,
+  ProjectDetailResponse,
   ProjectListParams,
   ProjectCreateParams,
   TaskItem,
+  TaskItemWithDependencies,
   TaskListParams,
   TaskCreateParams,
   ExpenseItem,
@@ -18,247 +20,292 @@ import type {
   PaginationResponse,
   ApiResponse
 } from '@/types/api/project'
+import { projectStorage, taskStorage, expenseStorage } from '@/utils/storage'
+// 从本地存储读取数据，如果没有则使用默认数据
+const loadProjects = (): ProjectItem[] => {
+  const storedProjects = projectStorage.getProjects()
+  return storedProjects.length > 0
+    ? storedProjects
+    : [
+        {
+          id: 1,
+          name: '电商平台重构',
+          description: '对现有电商平台进行全面重构，提升用户体验和系统性能',
+          status: 'in_progress',
+          priority: 'high',
+          progress: 65,
+          manager: '张三',
+          start_date: '2024-01-01',
+          end_date: '2024-06-30',
+          budget: 500000,
+          actual_cost: 320000,
+          created_at: '2023-12-15'
+        },
+        {
+          id: 2,
+          name: '移动应用开发',
+          description: '开发公司内部移动应用，提高工作效率',
+          status: 'in_progress',
+          priority: 'medium',
+          progress: 45,
+          manager: '李四',
+          start_date: '2024-02-15',
+          end_date: '2024-07-31',
+          budget: 350000,
+          actual_cost: 180000,
+          created_at: '2024-01-20'
+        },
+        {
+          id: 3,
+          name: '客户管理系统',
+          description: '开发客户关系管理系统，优化客户服务流程',
+          status: 'completed',
+          priority: 'high',
+          progress: 100,
+          manager: '王五',
+          start_date: '2023-09-01',
+          end_date: '2024-01-31',
+          budget: 280000,
+          actual_cost: 265000,
+          created_at: '2023-08-10'
+        },
+        {
+          id: 4,
+          name: '企业官网建设',
+          description: '设计并开发新的企业官网，提升品牌形象',
+          status: 'pending',
+          priority: 'low',
+          progress: 0,
+          manager: '赵六',
+          start_date: '2024-04-01',
+          end_date: '2024-05-31',
+          budget: 120000,
+          actual_cost: 0,
+          created_at: '2024-03-15'
+        },
+        {
+          id: 5,
+          name: '数据分析系统',
+          description: '开发数据分析平台，提供数据可视化和业务洞察',
+          status: 'on_hold',
+          priority: 'critical',
+          progress: 30,
+          manager: '张三',
+          start_date: '2024-01-15',
+          end_date: '2024-08-31',
+          budget: 650000,
+          actual_cost: 180000,
+          created_at: '2023-12-20'
+        }
+      ]
+}
+
+// 从本地存储读取数据，如果没有则使用默认数据
+const loadTasks = (): TaskItem[] => {
+  const storedTasks = taskStorage.getTasks()
+  return storedTasks.length > 0
+    ? storedTasks
+    : [
+        {
+          id: 1,
+          name: '需求分析',
+          description: '分析电商平台重构的详细需求',
+          status: 'completed',
+          priority: 'high',
+          progress: 100,
+          assignee: '张三',
+          project_id: 1,
+          project_name: '电商平台重构',
+          start_date: '2024-01-01',
+          end_date: '2024-01-15',
+          created_at: '2023-12-15'
+        },
+        {
+          id: 2,
+          name: 'UI设计',
+          description: '设计电商平台新的用户界面',
+          status: 'completed',
+          priority: 'medium',
+          progress: 100,
+          assignee: '李四',
+          project_id: 1,
+          project_name: '电商平台重构',
+          start_date: '2024-01-16',
+          end_date: '2024-02-15',
+          created_at: '2023-12-15'
+        },
+        {
+          id: 3,
+          name: '后端开发',
+          description: '开发电商平台后端API',
+          status: 'in_progress',
+          priority: 'high',
+          progress: 70,
+          assignee: '王五',
+          project_id: 1,
+          project_name: '电商平台重构',
+          start_date: '2024-02-01',
+          end_date: '2024-04-15',
+          created_at: '2023-12-15'
+        },
+        {
+          id: 4,
+          name: '前端开发',
+          description: '开发电商平台前端页面',
+          status: 'in_progress',
+          priority: 'high',
+          progress: 50,
+          assignee: '赵六',
+          project_id: 1,
+          project_name: '电商平台重构',
+          start_date: '2024-02-16',
+          end_date: '2024-05-15',
+          created_at: '2023-12-15'
+        },
+        {
+          id: 5,
+          name: '移动应用原型设计',
+          description: '设计移动应用的交互原型',
+          status: 'completed',
+          priority: 'medium',
+          progress: 100,
+          assignee: '李四',
+          project_id: 2,
+          project_name: '移动应用开发',
+          start_date: '2024-02-15',
+          end_date: '2024-03-15',
+          created_at: '2024-01-20'
+        },
+        {
+          id: 6,
+          name: '移动应用开发',
+          description: '开发iOS和Android移动应用',
+          status: 'in_progress',
+          priority: 'medium',
+          progress: 40,
+          assignee: '王五',
+          project_id: 2,
+          project_name: '移动应用开发',
+          start_date: '2024-03-16',
+          end_date: '2024-06-30',
+          created_at: '2024-01-20'
+        }
+      ]
+}
+
+// 从本地存储读取数据，如果没有则使用默认数据
+const loadExpenses = (): ExpenseItem[] => {
+  const storedExpenses = expenseStorage.getExpenses()
+  return storedExpenses.length > 0
+    ? storedExpenses
+    : [
+        {
+          id: 1,
+          date: '2024-02-28',
+          project_name: '电商平台重构',
+          type: 'expense',
+          description: '2月工资发放',
+          amount: -150000,
+          created_by: '张三'
+        },
+        {
+          id: 2,
+          date: '2024-02-25',
+          project_name: '移动应用开发',
+          type: 'expense',
+          description: '云服务费用',
+          amount: -35000,
+          created_by: '李四'
+        },
+        {
+          id: 3,
+          date: '2024-02-20',
+          project_name: '客户管理系统',
+          type: 'expense',
+          description: '服务器采购',
+          amount: -80000,
+          created_by: '赵六'
+        },
+        {
+          id: 4,
+          date: '2024-02-18',
+          project_name: '电商平台重构',
+          type: 'expense',
+          description: '项目奖金',
+          amount: -50000,
+          created_by: '张三'
+        },
+        {
+          id: 5,
+          date: '2024-02-15',
+          project_name: '企业官网建设',
+          type: 'expense',
+          description: '域名和服务费',
+          amount: -12000,
+          created_by: '李四'
+        },
+        {
+          id: 6,
+          date: '2024-02-10',
+          project_name: '电商平台重构',
+          type: 'income',
+          description: '项目回款',
+          amount: 500000,
+          created_by: '张三'
+        },
+        {
+          id: 7,
+          date: '2024-02-08',
+          project_name: '移动应用开发',
+          type: 'income',
+          description: '预付款',
+          amount: 300000,
+          created_by: '李四'
+        },
+        {
+          id: 8,
+          date: '2024-02-05',
+          project_name: '数据分析系统',
+          type: 'expense',
+          description: '迁移服务费',
+          amount: -45000,
+          created_by: '张三'
+        }
+      ]
+}
 
 // 模拟项目数据
-const mockProjects: ProjectItem[] = [
-  {
-    id: 1,
-    name: '电商平台重构',
-    description: '对现有电商平台进行全面重构，提升用户体验和系统性能',
-    status: 'in_progress',
-    priority: 'high',
-    progress: 65,
-    manager: '张三',
-    start_date: '2024-01-01',
-    end_date: '2024-06-30',
-    budget: 500000,
-    actual_cost: 320000,
-    created_at: '2023-12-15'
-  },
-  {
-    id: 2,
-    name: '移动应用开发',
-    description: '开发公司内部移动应用，提高工作效率',
-    status: 'in_progress',
-    priority: 'medium',
-    progress: 45,
-    manager: '李四',
-    start_date: '2024-02-15',
-    end_date: '2024-07-31',
-    budget: 350000,
-    actual_cost: 180000,
-    created_at: '2024-01-20'
-  },
-  {
-    id: 3,
-    name: '客户管理系统',
-    description: '开发客户关系管理系统，优化客户服务流程',
-    status: 'completed',
-    priority: 'high',
-    progress: 100,
-    manager: '王五',
-    start_date: '2023-09-01',
-    end_date: '2024-01-31',
-    budget: 280000,
-    actual_cost: 265000,
-    created_at: '2023-08-10'
-  },
-  {
-    id: 4,
-    name: '企业官网建设',
-    description: '设计并开发新的企业官网，提升品牌形象',
-    status: 'pending',
-    priority: 'low',
-    progress: 0,
-    manager: '赵六',
-    start_date: '2024-04-01',
-    end_date: '2024-05-31',
-    budget: 120000,
-    actual_cost: 0,
-    created_at: '2024-03-15'
-  },
-  {
-    id: 5,
-    name: '数据分析系统',
-    description: '开发数据分析平台，提供数据可视化和业务洞察',
-    status: 'on_hold',
-    priority: 'critical',
-    progress: 30,
-    manager: '张三',
-    start_date: '2024-01-15',
-    end_date: '2024-08-31',
-    budget: 650000,
-    actual_cost: 180000,
-    created_at: '2023-12-20'
-  }
-]
+const mockProjects: ProjectItem[] = loadProjects()
 
 // 模拟任务数据
-const mockTasks: TaskItem[] = [
-  {
-    id: 1,
-    name: '需求分析',
-    description: '分析电商平台重构的详细需求',
-    status: 'completed',
-    priority: 'high',
-    progress: 100,
-    assignee: '张三',
-    project_id: 1,
-    project_name: '电商平台重构',
-    start_date: '2024-01-01',
-    end_date: '2024-01-15',
-    created_at: '2023-12-15'
-  },
-  {
-    id: 2,
-    name: 'UI设计',
-    description: '设计电商平台新的用户界面',
-    status: 'completed',
-    priority: 'medium',
-    progress: 100,
-    assignee: '李四',
-    project_id: 1,
-    project_name: '电商平台重构',
-    start_date: '2024-01-16',
-    end_date: '2024-02-15',
-    created_at: '2023-12-15'
-  },
-  {
-    id: 3,
-    name: '后端开发',
-    description: '开发电商平台后端API',
-    status: 'in_progress',
-    priority: 'high',
-    progress: 70,
-    assignee: '王五',
-    project_id: 1,
-    project_name: '电商平台重构',
-    start_date: '2024-02-01',
-    end_date: '2024-04-15',
-    created_at: '2023-12-15'
-  },
-  {
-    id: 4,
-    name: '前端开发',
-    description: '开发电商平台前端页面',
-    status: 'in_progress',
-    priority: 'high',
-    progress: 50,
-    assignee: '赵六',
-    project_id: 1,
-    project_name: '电商平台重构',
-    start_date: '2024-02-16',
-    end_date: '2024-05-15',
-    created_at: '2023-12-15'
-  },
-  {
-    id: 5,
-    name: '移动应用原型设计',
-    description: '设计移动应用的交互原型',
-    status: 'completed',
-    priority: 'medium',
-    progress: 100,
-    assignee: '李四',
-    project_id: 2,
-    project_name: '移动应用开发',
-    start_date: '2024-02-15',
-    end_date: '2024-03-15',
-    created_at: '2024-01-20'
-  },
-  {
-    id: 6,
-    name: '移动应用开发',
-    description: '开发iOS和Android移动应用',
-    status: 'in_progress',
-    priority: 'medium',
-    progress: 40,
-    assignee: '王五',
-    project_id: 2,
-    project_name: '移动应用开发',
-    start_date: '2024-03-16',
-    end_date: '2024-06-30',
-    created_at: '2024-01-20'
-  }
-]
+const mockTasks: TaskItemWithDependencies[] = loadTasks() as TaskItemWithDependencies[]
 
 // 模拟费用数据
-const mockExpenses: ExpenseItem[] = [
-  {
-    id: 1,
-    date: '2024-02-28',
-    project_name: '电商平台重构',
-    type: 'expense',
-    description: '2月工资发放',
-    amount: -150000,
-    created_by: '张三'
-  },
-  {
-    id: 2,
-    date: '2024-02-25',
-    project_name: '移动应用开发',
-    type: 'expense',
-    description: '云服务费用',
-    amount: -35000,
-    created_by: '李四'
-  },
-  {
-    id: 3,
-    date: '2024-02-20',
-    project_name: '客户管理系统',
-    type: 'expense',
-    description: '服务器采购',
-    amount: -80000,
-    created_by: '赵六'
-  },
-  {
-    id: 4,
-    date: '2024-02-18',
-    project_name: '电商平台重构',
-    type: 'expense',
-    description: '项目奖金',
-    amount: -50000,
-    created_by: '张三'
-  },
-  {
-    id: 5,
-    date: '2024-02-15',
-    project_name: '企业官网建设',
-    type: 'expense',
-    description: '域名和服务费',
-    amount: -12000,
-    created_by: '李四'
-  },
-  {
-    id: 6,
-    date: '2024-02-10',
-    project_name: '电商平台重构',
-    type: 'income',
-    description: '项目回款',
-    amount: 500000,
-    created_by: '张三'
-  },
-  {
-    id: 7,
-    date: '2024-02-08',
-    project_name: '移动应用开发',
-    type: 'income',
-    description: '预付款',
-    amount: 300000,
-    created_by: '李四'
-  },
-  {
-    id: 8,
-    date: '2024-02-05',
-    project_name: '数据分析系统',
-    type: 'expense',
-    description: '迁移服务费',
-    amount: -45000,
-    created_by: '张三'
-  }
-]
-
+const mockExpenses: ExpenseItem[] = loadExpenses()
 // 模拟延迟
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * 根据任务进度更新项目进度
+ * @param projectId 项目ID
+ */
+const updateProjectProgress = (projectId: number) => {
+  const projectTasks = mockTasks.filter((task) => task.project_id === projectId)
+
+  if (projectTasks.length === 0) {
+    return
+  }
+
+  const totalProgress = projectTasks.reduce((sum, task) => sum + task.progress, 0)
+  const averageProgress = Math.round(totalProgress / projectTasks.length)
+
+  const projectIndex = mockProjects.findIndex((p) => p.id === projectId)
+
+  if (projectIndex !== -1) {
+    mockProjects[projectIndex].progress = averageProgress
+    projectStorage.saveProjects(mockProjects)
+  }
+}
 
 /**
  * 项目相关API
@@ -329,7 +376,7 @@ export const getProjectList = async (
 }
 
 // 获取项目详情
-export const getProjectDetail = async (id: number): Promise<ApiResponse<ProjectItem>> => {
+export const getProjectDetail = async (id: number): Promise<ApiResponse<ProjectDetailResponse>> => {
   await delay(200)
 
   const project = mockProjects.find((p) => p.id === id)
@@ -338,14 +385,36 @@ export const getProjectDetail = async (id: number): Promise<ApiResponse<ProjectI
     return {
       code: 404,
       message: '项目不存在',
-      data: {} as ProjectItem
+      data: {} as ProjectDetailResponse
     }
+  }
+
+  // 获取项目任务统计
+  const projectTasks = mockTasks.filter((task) => task.project_id === id)
+  const completedTasks = projectTasks.filter((task) => task.status === 'completed').length
+  const activeTasks = projectTasks.filter((task) =>
+    ['in_progress', 'review'].includes(task.status)
+  ).length
+  const overdueTasks = projectTasks.filter((task) => {
+    const endDate = new Date(task.end_date)
+    const today = new Date()
+    return endDate < today && task.status !== 'completed'
+  }).length
+
+  // 构建项目详情响应
+  const projectDetail: ProjectDetailResponse = {
+    ...project,
+    member_count: 6, // 模拟数据
+    total_tasks: projectTasks.length,
+    completed_tasks: completedTasks,
+    active_tasks: activeTasks,
+    overdue_tasks: overdueTasks
   }
 
   return {
     code: 200,
     message: 'success',
-    data: project
+    data: projectDetail
   }
 }
 
@@ -364,6 +433,7 @@ export const createProject = async (
   }
 
   mockProjects.push(newProject)
+  projectStorage.saveProjects(mockProjects)
 
   return {
     code: 200,
@@ -395,6 +465,7 @@ export const updateProject = async (
   }
 
   mockProjects[index] = updatedProject
+  projectStorage.saveProjects(mockProjects)
 
   return {
     code: 200,
@@ -418,6 +489,7 @@ export const deleteProject = async (id: number): Promise<ApiResponse<boolean>> =
   }
 
   mockProjects.splice(index, 1)
+  projectStorage.saveProjects(mockProjects)
 
   return {
     code: 200,
@@ -436,6 +508,7 @@ export const batchDeleteProjects = async (ids: number[]): Promise<ApiResponse<bo
       mockProjects.splice(index, 1)
     }
   }
+  projectStorage.saveProjects(mockProjects)
 
   return {
     code: 200,
@@ -459,6 +532,7 @@ export const archiveProject = async (id: number): Promise<ApiResponse<boolean>> 
   }
 
   mockProjects[index].status = 'completed'
+  projectStorage.saveProjects(mockProjects)
 
   return {
     code: 200,
@@ -573,15 +647,20 @@ export const createTask = async (data: TaskCreateParams): Promise<ApiResponse<Ta
     }
   }
 
-  const newTask: TaskItem = {
+  const newTask: TaskItemWithDependencies = {
     id: mockTasks.length + 1,
     ...data,
     progress: data.progress || 0,
     project_name: project.name,
-    created_at: new Date().toISOString().split('T')[0]
+    created_at: new Date().toISOString().split('T')[0],
+    dependencies: data.dependencies || []
   }
 
   mockTasks.push(newTask)
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  updateProjectProgress(project.id)
 
   return {
     code: 200,
@@ -617,13 +696,22 @@ export const updateTask = async (
     }
   }
 
-  const updatedTask: TaskItem = {
+  const updatedTask: TaskItemWithDependencies = {
     ...mockTasks[index],
     ...data,
-    project_name: project.name
+    project_name: project.name,
+    dependencies: data.dependencies || []
   }
 
+  const oldTask = mockTasks[index]
   mockTasks[index] = updatedTask
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  updateProjectProgress(oldTask.project_id)
+  if (oldTask.project_id !== data.project_id) {
+    updateProjectProgress(data.project_id)
+  }
 
   return {
     code: 200,
@@ -646,7 +734,12 @@ export const deleteTask = async (id: number): Promise<ApiResponse<boolean>> => {
     }
   }
 
+  const task = mockTasks[index]
   mockTasks.splice(index, 1)
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  updateProjectProgress(task.project_id)
 
   return {
     code: 200,
@@ -675,7 +768,12 @@ export const completeTask = async (id: number): Promise<ApiResponse<TaskItem>> =
     progress: 100
   }
 
+  const task = mockTasks[index]
   mockTasks[index] = completedTask
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  updateProjectProgress(task.project_id)
 
   return {
     code: 200,
@@ -688,9 +786,12 @@ export const completeTask = async (id: number): Promise<ApiResponse<TaskItem>> =
 export const batchCompleteTasks = async (ids: number[]): Promise<ApiResponse<boolean>> => {
   await delay(500)
 
+  const projectIds = new Set<number>()
+
   for (const id of ids) {
     const index = mockTasks.findIndex((t) => t.id === id)
     if (index !== -1) {
+      projectIds.add(mockTasks[index].project_id)
       mockTasks[index] = {
         ...mockTasks[index],
         status: 'completed',
@@ -698,6 +799,11 @@ export const batchCompleteTasks = async (ids: number[]): Promise<ApiResponse<boo
       }
     }
   }
+
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  projectIds.forEach((projectId) => updateProjectProgress(projectId))
 
   return {
     code: 200,
@@ -710,12 +816,20 @@ export const batchCompleteTasks = async (ids: number[]): Promise<ApiResponse<boo
 export const batchDeleteTasks = async (ids: number[]): Promise<ApiResponse<boolean>> => {
   await delay(500)
 
+  const projectIds = new Set<number>()
+
   for (const id of ids) {
     const index = mockTasks.findIndex((t) => t.id === id)
     if (index !== -1) {
+      projectIds.add(mockTasks[index].project_id)
       mockTasks.splice(index, 1)
     }
   }
+
+  taskStorage.saveTasks(mockTasks)
+
+  // 更新项目进度
+  projectIds.forEach((projectId) => updateProjectProgress(projectId))
 
   return {
     code: 200,
@@ -823,6 +937,7 @@ export const createExpense = async (
   }
 
   mockExpenses.push(newExpense)
+  expenseStorage.saveExpenses(mockExpenses)
 
   return {
     code: 200,
@@ -858,6 +973,7 @@ export const updateExpense = async (
   }
 
   mockExpenses[index] = updatedExpense
+  expenseStorage.saveExpenses(mockExpenses)
 
   return {
     code: 200,
@@ -881,6 +997,7 @@ export const deleteExpense = async (id: number): Promise<ApiResponse<boolean>> =
   }
 
   mockExpenses.splice(index, 1)
+  expenseStorage.saveExpenses(mockExpenses)
 
   return {
     code: 200,

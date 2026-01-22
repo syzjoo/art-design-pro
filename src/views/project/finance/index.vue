@@ -22,7 +22,33 @@
             新增费用
           </ElButton>
         </template>
+        <template #right>
+          <div class="flex gap-2">
+            <el-button type="info" @click="showBudgetAnalysis = true">
+              <el-icon><DataAnalysis /></el-icon>
+              预算分析
+            </el-button>
+          </div>
+        </template>
       </ArtTableHeader>
+
+      <div class="mb-4">
+        <el-row :gutter="20">
+          <el-col :span="6" v-for="stat in financialStats" :key="stat.label">
+            <el-card :body-style="{ padding: '15px' }">
+              <div class="text-center">
+                <div class="text-gray-400 text-sm">{{ stat.label }}</div>
+                <div
+                  class="text-2xl font-bold"
+                  :class="stat.amount > 0 ? 'text-success' : 'text-danger'"
+                >
+                  {{ stat.amount > 0 ? '+' : '' }}¥{{ formatNumber(Math.abs(stat.amount)) }}
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
 
       <ArtTable
         :data="expenseList"
@@ -34,6 +60,7 @@
         :pagination="pagination"
         @pagination:size-change="handleSizeChange"
         @pagination:current-change="handlePageChange"
+        style="transition: opacity 0.3s ease"
       >
         <template #type="{ row }">
           <el-tag :type="getExpenseType(row.type)">{{ getExpenseTypeName(row.type) }}</el-tag>
@@ -57,15 +84,53 @@
         :expense-data="editExpenseData"
         @submit="handleFormSubmit"
       />
+
+      <!-- 预算分析对话框 -->
+      <ElDialog v-model="showBudgetAnalysis" title="预算分析" width="80%" destroy-on-close>
+        <div class="budget-analysis">
+          <div v-if="budgetAnalysisData.length === 0" class="text-center py-10">
+            <el-empty description="暂无预算数据" />
+          </div>
+          <div v-else>
+            <el-table :data="budgetAnalysisData" stripe border>
+              <el-table-column prop="project_name" label="项目名称" width="200" />
+              <el-table-column prop="budget" label="预算" width="120">
+                <template #default="{ row }"> ¥{{ formatNumber(row.budget) }} </template>
+              </el-table-column>
+              <el-table-column prop="actual_cost" label="实际支出" width="120">
+                <template #default="{ row }"> ¥{{ formatNumber(row.actual_cost) }} </template>
+              </el-table-column>
+              <el-table-column prop="remaining" label="剩余预算" width="120">
+                <template #default="{ row }"> ¥{{ formatNumber(row.remaining) }} </template>
+              </el-table-column>
+              <el-table-column prop="usage_rate" label="使用率" width="100">
+                <template #default="{ row }">
+                  <div class="flex items-center">
+                    <el-progress
+                      :percentage="row.usage_rate"
+                      :color="getUsageRateColor(row.usage_rate)"
+                      :stroke-width="10"
+                      :show-text="false"
+                      class="mr-2"
+                      style="flex: 1"
+                    />
+                    <span>{{ row.usage_rate }}%</span>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </ElDialog>
     </ElCard>
   </div>
 </template>
 <script setup lang="ts">
   import { ref, reactive, computed, onMounted } from 'vue'
-  import { Plus } from '@element-plus/icons-vue'
-  import { ElMessage, ElMessageBox, ElButton } from 'element-plus'
+  import { Plus, DataAnalysis } from '@element-plus/icons-vue'
+  import { ElMessage, ElMessageBox, ElButton, ElEmpty } from 'element-plus'
   import type { ColumnOption } from '@/types/component'
-  import type { ExpenseItem } from '@/types/api/project'
+  import type { ExpenseItem, ProjectItem } from '@/types/api/project'
   import {
     getExpenseList,
     createExpense,
@@ -82,10 +147,31 @@
 
   const loading = ref(false)
   const dialogVisible = ref(false)
+  const showBudgetAnalysis = ref(false)
   const editExpenseData = ref<any>(undefined)
 
   const expenseList = ref<ExpenseItem[]>([])
-  const projectList = ref<any[]>([])
+  const projectList = ref<ProjectItem[]>([])
+  const budgetAnalysisData = ref<any[]>([])
+
+  // 财务统计数据
+  const financialStats = computed(() => {
+    const totalIncome = expenseList.value
+      .filter((e) => e.type === 'income')
+      .reduce((sum, e) => sum + e.amount, 0)
+
+    const totalExpense = Math.abs(
+      expenseList.value.filter((e) => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0)
+    )
+
+    const netIncome = totalIncome - totalExpense
+
+    return [
+      { label: '总收入', amount: totalIncome },
+      { label: '总支出', amount: -totalExpense },
+      { label: '净利润', amount: netIncome }
+    ]
+  })
 
   // 搜索表单
   const formFilters = reactive({
@@ -182,6 +268,12 @@
     return num.toLocaleString('zh-CN')
   }
 
+  const getUsageRateColor = (rate: number) => {
+    if (rate < 70) return '#67C23A' // 绿色
+    if (rate < 90) return '#E6A23C' // 黄色
+    return '#F56C6C' // 红色
+  }
+
   const handleAddExpense = () => {
     editExpenseData.value = undefined
     dialogVisible.value = true
@@ -235,11 +327,20 @@
       }
 
       const response = await getExpenseList(params)
-      expenseList.value = response.data.data
-      pagination.total = response.data.total
+
+      if (response.code === 200) {
+        expenseList.value = response.data.data
+        pagination.total = response.data.total
+      } else {
+        ElMessage.error(`获取费用列表失败: ${response.message}`)
+      }
+
+      // 加载项目列表用于预算分析
+      await loadProjects()
+      calculateBudgetAnalysis()
     } catch (error) {
-      ElMessage.error('获取费用列表失败')
       console.error('获取费用列表失败:', error)
+      ElMessage.error('获取费用列表失败，请稍后重试')
     } finally {
       loading.value = false
     }
@@ -295,6 +396,28 @@
       ElMessage.error('获取项目列表失败')
       console.error('获取项目列表失败:', error)
     }
+  }
+
+  const calculateBudgetAnalysis = () => {
+    budgetAnalysisData.value = projectList.value.map((project) => {
+      // 计算项目的实际支出
+      const projectExpenses = expenseList.value.filter(
+        (expense) => expense.project_name === project.name && expense.type === 'expense'
+      )
+
+      const actualCost = Math.abs(projectExpenses.reduce((sum, expense) => sum + expense.amount, 0))
+
+      const remaining = project.budget - actualCost
+      const usageRate = project.budget > 0 ? Math.round((actualCost / project.budget) * 100) : 0
+
+      return {
+        project_name: project.name,
+        budget: project.budget,
+        actual_cost: actualCost,
+        remaining: remaining,
+        usage_rate: usageRate
+      }
+    })
   }
 
   onMounted(async () => {

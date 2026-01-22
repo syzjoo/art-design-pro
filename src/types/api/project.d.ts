@@ -26,6 +26,15 @@ export interface ProjectItem {
   created_at: string
 }
 
+// 项目详细信息
+export interface ProjectDetailResponse extends ProjectItem {
+  member_count: number
+  total_tasks: number
+  completed_tasks: number
+  active_tasks: number
+  overdue_tasks: number
+}
+
 // 项目列表查询参数
 export interface ProjectListParams {
   keyword?: string
@@ -97,6 +106,12 @@ export interface TaskCreateParams {
   start_date: string
   end_date: string
   progress?: number
+  dependencies?: number[]
+}
+
+// 任务基本信息（包含依赖关系）
+export interface TaskItemWithDependencies extends TaskItem {
+  dependencies?: number[]
 }
 
 // 任务完成参数

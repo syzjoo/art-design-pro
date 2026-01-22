@@ -77,6 +77,17 @@
       <ElFormItem label="任务进度" prop="progress">
         <ElSlider v-model="formData.progress" :min="0" :max="100" :step="5" show-input />
       </ElFormItem>
+
+      <ElFormItem label="依赖任务" prop="dependencies">
+        <ElSelect v-model="formData.dependencies" multiple placeholder="请选择依赖任务">
+          <ElOption
+            v-for="task in availableTasks"
+            :key="task.id"
+            :label="task.name"
+            :value="task.id"
+          />
+        </ElSelect>
+      </ElFormItem>
     </ElForm>
 
     <template #footer>
@@ -92,7 +103,8 @@
   import { ref, computed, watch } from 'vue'
   import { ElMessage } from 'element-plus'
   import type { FormInstance, FormRules } from 'element-plus'
-  import type { TaskItem } from '@/types/api/project'
+  import type { TaskItemWithDependencies, TaskStatus, TaskPriority } from '@/types/api/project'
+  import { getTaskList } from '@/api/project'
 
   defineOptions({ name: 'TaskForm' })
 
@@ -103,7 +115,7 @@
 
   interface Props {
     visible: boolean
-    taskData?: TaskItem
+    taskData?: TaskItemWithDependencies
     projectList: ProjectItem[]
   }
 
@@ -115,7 +127,7 @@
 
   const emit = defineEmits<{
     (e: 'update:visible', value: boolean): void
-    (e: 'submit', data: TaskItem): void
+    (e: 'submit', data: TaskItemWithDependencies): void
   }>()
 
   const formRef = ref<FormInstance>()
@@ -127,17 +139,20 @@
   const isEdit = computed(() => !!props.taskData?.id)
   const dialogTitle = computed(() => (isEdit.value ? '编辑任务' : '创建任务'))
 
-  const formData = ref<TaskItem>({
+  const formData = ref<TaskItemWithDependencies>({
+    id: Date.now(),
     name: '',
     description: '',
-    status: 'todo',
-    priority: 'medium',
+    status: 'todo' as TaskStatus,
+    priority: 'medium' as TaskPriority,
     progress: 0,
     assignee: '',
     project_id: 0,
     project_name: '',
     start_date: '',
-    end_date: ''
+    end_date: '',
+    created_at: new Date().toISOString().split('T')[0],
+    dependencies: [] as number[]
   })
 
   const rules = computed<FormRules>(() => ({
@@ -161,9 +176,20 @@
     ]
   }))
 
+  const availableTasks = ref<any[]>([])
+
+  const loadAvailableTasks = async () => {
+    try {
+      const response = await getTaskList()
+      availableTasks.value = response.data.data
+    } catch (error) {
+      console.error('获取任务列表失败:', error)
+    }
+  }
+
   watch(
     () => props.visible,
-    (val) => {
+    async (val) => {
       if (val) {
         if (props.taskData?.id) {
           formData.value = { ...props.taskData }
@@ -173,22 +199,27 @@
         setTimeout(() => {
           formRef.value?.clearValidate()
         }, 100)
+        // 加载可用的任务列表
+        await loadAvailableTasks()
       }
     }
   )
 
   const resetForm = () => {
     formData.value = {
+      id: Date.now(),
       name: '',
       description: '',
-      status: 'todo',
-      priority: 'medium',
+      status: 'todo' as TaskStatus,
+      priority: 'medium' as TaskPriority,
       progress: 0,
       assignee: '',
       project_id: 0,
       project_name: '',
       start_date: '',
-      end_date: ''
+      end_date: '',
+      created_at: new Date().toISOString().split('T')[0],
+      dependencies: [] as number[]
     }
     formRef.value?.clearValidate()
   }
@@ -203,7 +234,22 @@
 
       loading.value = true
 
-      const submitData = { ...formData.value }
+      const submitData: TaskItemWithDependencies = {
+        id: formData.value.id || Date.now(),
+        name: formData.value.name,
+        description: formData.value.description,
+        status: formData.value.status,
+        priority: formData.value.priority,
+        progress: formData.value.progress,
+        assignee: formData.value.assignee,
+        project_id: formData.value.project_id,
+        project_name: formData.value.project_name,
+        start_date: formData.value.start_date,
+        end_date: formData.value.end_date,
+        created_at: formData.value.created_at || new Date().toISOString().split('T')[0],
+        dependencies: formData.value.dependencies || []
+      }
+
       const project = props.projectList.find((p) => p.id === submitData.project_id)
       if (project) {
         submitData.project_name = project.name
@@ -213,8 +259,6 @@
         emit('submit', submitData)
         ElMessage.success('任务更新成功')
       } else {
-        submitData.id = Date.now()
-        submitData.created_at = new Date().toISOString().split('T')[0]
         emit('submit', submitData)
         ElMessage.success('任务创建成功')
       }

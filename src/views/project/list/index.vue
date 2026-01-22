@@ -39,6 +39,7 @@
         @selection-change="handleSelectionChange"
         @pagination:size-change="handleSizeChange"
         @pagination:current-change="handlePageChange"
+        style="transition: opacity 0.3s ease"
       >
         <template #status="{ row }">
           <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
@@ -77,7 +78,7 @@
     ProjectStatus,
     ProjectPriority
   } from '@/types/api/project'
-  import { getProjectList } from '@/api/project'
+  import { getProjectList, archiveProject } from '@/api/project'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import ProjectForm from './modules/ProjectForm.vue'
 
@@ -276,9 +277,12 @@
       if (response.code === 200) {
         projectList.value = response.data.data
         pagination.total = response.data.total
+      } else {
+        ElMessage.error(`获取项目列表失败: ${response.message}`)
       }
-    } catch {
-      ElMessage.error('获取项目列表失败')
+    } catch (error) {
+      console.error('获取项目列表失败:', error)
+      ElMessage.error('获取项目列表失败，请稍后重试')
     } finally {
       loading.value = false
     }
@@ -349,17 +353,35 @@
           type: 'info'
         }
       )
-      selectedProjects.value.forEach((project) => {
-        const index = projectList.value.findIndex((item: ProjectItem) => item.id === project.id)
-        if (index > -1) {
-          projectList.value[index].status = 'on_hold'
+
+      loading.value = true
+
+      const archivePromises = selectedProjects.value.map(async (project) => {
+        const response = await archiveProject(project.id)
+        if (response.code === 200) {
+          const index = projectList.value.findIndex((item: ProjectItem) => item.id === project.id)
+          if (index > -1) {
+            projectList.value[index].status = 'completed'
+          }
         }
+        return response
       })
+
+      await Promise.all(archivePromises)
+
       selectedProjects.value = []
       tableRef.value?.elTableRef?.clearSelection()
       ElMessage.success('批量归档成功')
-    } catch {
-      ElMessage.info('已取消归档')
+      handleRefresh()
+    } catch (error) {
+      console.error('批量归档失败:', error)
+      if (error !== 'cancel') {
+        ElMessage.error('批量归档失败，请稍后重试')
+      } else {
+        ElMessage.info('已取消归档')
+      }
+    } finally {
+      loading.value = false
     }
   }
 
@@ -379,15 +401,18 @@
         }
       )
       const idsToDelete = selectedProjects.value.map((p) => p.id)
-      projectList.value = projectList.value.filter(
-        (item: ProjectItem) => !idsToDelete.includes(item.id)
-      )
+      projectList.value = projectList.value.filter((item) => !idsToDelete.includes(item.id))
       pagination.total = projectList.value.length
       selectedProjects.value = []
       tableRef.value?.elTableRef?.clearSelection()
       ElMessage.success('批量删除成功')
-    } catch {
-      ElMessage.info('已取消删除')
+    } catch (error) {
+      if (error !== 'cancel') {
+        ElMessage.error('批量删除失败')
+        console.error('批量删除失败:', error)
+      } else {
+        ElMessage.info('已取消删除')
+      }
     }
   }
 
