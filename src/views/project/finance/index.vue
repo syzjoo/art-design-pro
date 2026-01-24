@@ -1,5 +1,28 @@
 <template>
   <div class="finance-page art-full-height flex flex-col">
+    <!-- 财务统计卡片，放到筛选组件上面，居中展示 -->
+    <div class="mb-4 flex justify-center">
+      <div class="w-full max-w-4xl">
+        <el-row :gutter="20" justify="center">
+          <el-col :span="8" v-for="stat in financialStats" :key="stat.label">
+            <el-card :body-style="{ padding: '15px' }">
+              <div class="text-center">
+                <div class="text-gray-400 text-sm">{{ stat.label }}</div>
+                <div
+                  class="text-2xl font-bold"
+                  :class="stat.amount > 0 ? 'text-success' : 'text-danger'"
+                >
+                  {{ stat.amount > 0 ? '+' : stat.amount < 0 ? '-' : '' }}¥{{
+                    formatNumber(Math.abs(stat.amount))
+                  }}
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
+    </div>
+
     <ArtSearchBar
       v-model="formFilters"
       :items="formItems"
@@ -31,24 +54,6 @@
           </div>
         </template>
       </ArtTableHeader>
-
-      <div class="mb-4">
-        <el-row :gutter="20">
-          <el-col :span="6" v-for="stat in financialStats" :key="stat.label">
-            <el-card :body-style="{ padding: '15px' }">
-              <div class="text-center">
-                <div class="text-gray-400 text-sm">{{ stat.label }}</div>
-                <div
-                  class="text-2xl font-bold"
-                  :class="stat.amount > 0 ? 'text-success' : 'text-danger'"
-                >
-                  {{ stat.amount > 0 ? '+' : '' }}¥{{ formatNumber(Math.abs(stat.amount)) }}
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
 
       <ArtTable
         :data="expenseList"
@@ -158,10 +163,12 @@
   const financialStats = computed(() => {
     const totalIncome = expenseList.value
       .filter((e) => e.type === 'income')
-      .reduce((sum, e) => sum + e.amount, 0)
+      .reduce((sum, e) => sum + (isNaN(Number(e.amount)) ? 0 : Number(e.amount)), 0)
 
     const totalExpense = Math.abs(
-      expenseList.value.filter((e) => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0)
+      expenseList.value
+        .filter((e) => e.type === 'expense')
+        .reduce((sum, e) => sum + (isNaN(Number(e.amount)) ? 0 : Number(e.amount)), 0)
     )
 
     const netIncome = totalIncome - totalExpense
@@ -327,13 +334,8 @@
       }
 
       const response = await getExpenseList(params)
-
-      if (response.code === 200) {
-        expenseList.value = response.data.data
-        pagination.total = response.data.total
-      } else {
-        ElMessage.error(`获取费用列表失败: ${response.message}`)
-      }
+      expenseList.value = response.data
+      pagination.total = response.total
 
       // 加载项目列表用于预算分析
       await loadProjects()
@@ -391,7 +393,7 @@
   const loadProjects = async () => {
     try {
       const response = await getProjectList()
-      projectList.value = response.data.data
+      projectList.value = response.data
     } catch (error) {
       ElMessage.error('获取项目列表失败')
       console.error('获取项目列表失败:', error)
@@ -405,7 +407,12 @@
         (expense) => expense.project_name === project.name && expense.type === 'expense'
       )
 
-      const actualCost = Math.abs(projectExpenses.reduce((sum, expense) => sum + expense.amount, 0))
+      const actualCost = Math.abs(
+        projectExpenses.reduce(
+          (sum, expense) => sum + (isNaN(Number(expense.amount)) ? 0 : Number(expense.amount)),
+          0
+        )
+      )
 
       const remaining = project.budget - actualCost
       const usageRate = project.budget > 0 ? Math.round((actualCost / project.budget) * 100) : 0

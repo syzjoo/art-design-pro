@@ -27,6 +27,7 @@ const LOGOUT_DELAY = 500
 const MAX_RETRIES = 0
 const RETRY_DELAY = 1000
 const UNAUTHORIZED_DEBOUNCE_TIME = 3000
+const CACHE_EXPIRY_TIME = 60000 // 缓存过期时间（毫秒）
 
 /** 401防抖状态 */
 let isUnauthorizedErrorShown = false
@@ -40,7 +41,20 @@ let refreshSubscribers: ((token: string) => void)[] = []
 interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
   showErrorMessage?: boolean
   showSuccessMessage?: boolean
+  useCache?: boolean // 是否使用缓存
+  cacheKey?: string // 自定义缓存键
+  cacheExpiry?: number // 缓存过期时间（毫秒）
 }
+
+/** 请求缓存 */
+interface RequestCache {
+  data: any
+  timestamp: number
+  expiry: number
+}
+
+/** 缓存存储 */
+const cacheStorage: Record<string, RequestCache> = {}
 
 const { VITE_API_URL, VITE_WITH_CREDENTIALS } = import.meta.env
 
@@ -280,8 +294,76 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** 生成缓存键 */
+function generateCacheKey(config: ExtendedAxiosRequestConfig): string {
+  if (config.cacheKey) {
+    return config.cacheKey
+  }
+
+  const { url, method, params, data } = config
+  const keyParts = [
+    url || '',
+    method || 'GET',
+    JSON.stringify(params || {}),
+    JSON.stringify(data || {})
+  ]
+
+  return keyParts.join('|')
+}
+
+/** 检查缓存是否有效 */
+function isCacheValid(cache: RequestCache): boolean {
+  if (!cache) return false
+
+  const now = Date.now()
+  return now - cache.timestamp < cache.expiry
+}
+
+/** 获取缓存 */
+function getCache(key: string): any {
+  const cache = cacheStorage[key]
+  if (isCacheValid(cache)) {
+    return cache.data
+  }
+
+  // 缓存过期，清除缓存
+  delete cacheStorage[key]
+  return null
+}
+
+/** 设置缓存 */
+function setCache(key: string, data: any, expiry: number = CACHE_EXPIRY_TIME): void {
+  cacheStorage[key] = {
+    data,
+    timestamp: Date.now(),
+    expiry
+  }
+}
+
+/** 清除缓存 */
+function clearCache(key?: string): void {
+  if (key) {
+    delete cacheStorage[key]
+  } else {
+    Object.keys(cacheStorage).forEach((cacheKey) => {
+      delete cacheStorage[cacheKey]
+    })
+  }
+}
+
 /** 请求函数 */
 async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> {
+  // 检查缓存
+  if (config.useCache && config.method?.toUpperCase() === 'GET') {
+    const cacheKey = generateCacheKey(config)
+    const cachedData = getCache(cacheKey)
+
+    if (cachedData) {
+      console.log(`[HTTP Cache] Using cached data for: ${config.url}`)
+      return cachedData as T
+    }
+  }
+
   // POST | PUT 参数自动填充
   if (
     ['POST', 'PUT'].includes(config.method?.toUpperCase() || '') &&
@@ -298,6 +380,14 @@ async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> 
     // 显示成功消息
     if (config.showSuccessMessage && res.data.msg) {
       showSuccess(res.data.msg)
+    }
+
+    // 存储缓存
+    if (config.useCache && config.method?.toUpperCase() === 'GET') {
+      const cacheKey = generateCacheKey(config)
+      const cacheExpiry = config.cacheExpiry || CACHE_EXPIRY_TIME
+      setCache(cacheKey, res.data.data, cacheExpiry)
+      console.log(`[HTTP Cache] Stored data for: ${config.url}`)
     }
 
     return res.data.data as T
@@ -326,6 +416,9 @@ const api = {
   },
   request<T>(config: ExtendedAxiosRequestConfig) {
     return retryRequest<T>(config)
+  },
+  clearCache(key?: string) {
+    clearCache(key)
   }
 }
 

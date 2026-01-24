@@ -242,9 +242,24 @@
   const rootProps = ['label', 'labelWidth', 'key', 'type', 'hidden', 'span', 'slots']
 
   const getProps = (item: SearchFormItem) => {
-    if (item.props) return item.props
+    if (item.props) {
+      // 如果有props，先复制item，然后删除rootProps，最后合并item.props
+      const props = { ...item }
+      rootProps.forEach((key) => delete (props as Record<string, any>)[key])
+      return { ...props, ...item.props }
+    }
+
+    // 如果没有props，直接处理item
     const props = { ...item }
     rootProps.forEach((key) => delete (props as Record<string, any>)[key])
+
+    // 为日期范围类型自动设置type属性
+    if (item.type === 'daterange') {
+      props.type = 'daterange'
+    } else if (item.type === 'datetimerange') {
+      props.type = 'datetimerange'
+    }
+
     return props
   }
 

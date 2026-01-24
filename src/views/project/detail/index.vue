@@ -253,66 +253,9 @@
     completed: boolean
   }
 
-  const projectTeam = ref<TeamMember[]>([
-    { id: 1, name: '张三', role: '项目经理', avatar: '', status: '在线' },
-    { id: 2, name: '李四', role: '前端开发', avatar: '', status: '在线' },
-    { id: 3, name: '王五', role: '后端开发', avatar: '', status: '离线' },
-    { id: 4, name: '赵六', role: 'UI设计师', avatar: '', status: '在线' },
-    { id: 5, name: '孙七', role: '测试工程师', avatar: '', status: '在线' },
-    { id: 6, name: '周八', role: '产品经理', avatar: '', status: '离线' }
-  ])
-
-  const projectMilestones = ref<Milestone[]>([
-    {
-      id: 1,
-      name: '需求分析',
-      description: '完成项目需求调研和分析',
-      date: '2024-01-20',
-      completed: true
-    },
-    {
-      id: 2,
-      name: '系统设计',
-      description: '完成系统架构和数据库设计',
-      date: '2024-02-15',
-      completed: true
-    },
-    {
-      id: 3,
-      name: '前端开发',
-      description: '完成前端页面开发',
-      date: '2024-04-30',
-      completed: true
-    },
-    {
-      id: 4,
-      name: '后端开发',
-      description: '完成后端API开发',
-      date: '2024-05-15',
-      completed: false
-    },
-    {
-      id: 5,
-      name: '测试验收',
-      description: '完成系统测试和用户验收',
-      date: '2024-06-20',
-      completed: false
-    },
-    {
-      id: 6,
-      name: '项目上线',
-      description: '系统正式上线运行',
-      date: '2024-06-30',
-      completed: false
-    }
-  ])
-
-  const projectFiles = ref<any[]>([
-    { name: '项目需求文档.pdf', url: '#', size: 2048, status: 'done', uid: 1 },
-    { name: '系统设计方案.docx', url: '#', size: 1024, status: 'done', uid: 2 },
-    { name: '数据库设计图.png', url: '#', size: 512, status: 'done', uid: 3 },
-    { name: '前端原型图.sketch', url: '#', size: 4096, status: 'done', uid: 4 }
-  ])
+  const projectTeam = ref<TeamMember[]>([])
+  const projectMilestones = ref<Milestone[]>([])
+  const projectFiles = ref<any[]>([])
 
   const getStatusType = (status: ProjectStatus) => {
     const statusMap: Record<string, 'info' | 'primary' | 'success' | 'warning' | 'danger'> = {
@@ -398,12 +341,7 @@
         error.value = false
         const id = Number(projectId.value)
         const response = await getProjectDetail(id)
-        if (response.code === 200) {
-          projectData.value = response.data
-        } else {
-          ElMessage.error(`获取项目详情失败: ${response.message}`)
-          error.value = true
-        }
+        projectData.value = response
       } catch (err) {
         console.error('获取项目详情失败:', err)
         ElMessage.error('获取项目详情失败，请稍后重试')

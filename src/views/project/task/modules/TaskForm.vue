@@ -181,7 +181,7 @@
   const loadAvailableTasks = async () => {
     try {
       const response = await getTaskList()
-      availableTasks.value = response.data.data
+      availableTasks.value = response.data
     } catch (error) {
       console.error('获取任务列表失败:', error)
     }
@@ -234,8 +234,12 @@
 
       loading.value = true
 
-      const submitData: TaskItemWithDependencies = {
-        id: formData.value.id || Date.now(),
+      // 获取项目名称
+      const project = props.projectList.find((p) => p.id === formData.value.project_id)
+      const projectName = project?.name || ''
+
+      // 创建提交数据，确保类型正确
+      let submitData: any = {
         name: formData.value.name,
         description: formData.value.description,
         status: formData.value.status,
@@ -243,19 +247,19 @@
         progress: formData.value.progress,
         assignee: formData.value.assignee,
         project_id: formData.value.project_id,
-        project_name: formData.value.project_name,
+        project_name: projectName,
         start_date: formData.value.start_date,
         end_date: formData.value.end_date,
-        created_at: formData.value.created_at || new Date().toISOString().split('T')[0],
         dependencies: formData.value.dependencies || []
       }
 
-      const project = props.projectList.find((p) => p.id === submitData.project_id)
-      if (project) {
-        submitData.project_name = project.name
-      }
-
+      // 编辑模式时才包含id和created_at
       if (isEdit.value) {
+        submitData = {
+          ...submitData,
+          id: formData.value.id,
+          created_at: formData.value.created_at
+        }
         emit('submit', submitData)
         ElMessage.success('任务更新成功')
       } else {

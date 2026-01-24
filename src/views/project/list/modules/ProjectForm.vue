@@ -23,10 +23,10 @@
       <ElFormItem label="项目状态" prop="status">
         <ElSelect v-model="formData.status" placeholder="请选择项目状态">
           <ElOption label="未开始" value="pending" />
-          <ElOption label="进行中" value="active" />
+          <ElOption label="进行中" value="in_progress" />
           <ElOption label="已完成" value="completed" />
-          <ElOption label="已暂停" value="suspended" />
-          <ElOption label="已归档" value="archived" />
+          <ElOption label="已暂停" value="on_hold" />
+          <ElOption label="已取消" value="cancelled" />
         </ElSelect>
       </ElFormItem>
 
@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
   import { ref, computed, watch } from 'vue'
-  import { ElMessage } from 'element-plus'
+
   import type { FormInstance, FormRules } from 'element-plus'
   import type { ProjectItem } from '@/types/api/project'
 
@@ -155,8 +155,27 @@
     (val) => {
       if (val) {
         if (props.projectData?.id) {
-          // 编辑模式，复制数据
-          formData.value = { ...props.projectData }
+          // 编辑模式，复制数据并转换类型
+          formData.value = {
+            ...props.projectData,
+            // 将字符串类型的数值转换为数字类型
+            budget:
+              typeof props.projectData.budget === 'string'
+                ? parseFloat(props.projectData.budget)
+                : props.projectData.budget,
+            actual_cost:
+              typeof props.projectData.actual_cost === 'string'
+                ? parseFloat(props.projectData.actual_cost)
+                : props.projectData.actual_cost,
+            progress:
+              typeof props.projectData.progress === 'string'
+                ? parseInt(props.projectData.progress)
+                : props.projectData.progress,
+            id:
+              typeof props.projectData.id === 'string'
+                ? parseInt(props.projectData.id)
+                : props.projectData.id
+          }
         } else {
           // 新建模式，重置表单
           resetForm()
@@ -199,19 +218,7 @@
 
       const submitData = { ...formData.value }
 
-      if (isEdit.value) {
-        // 编辑模式
-        emit('submit', submitData)
-        ElMessage.success('项目更新成功')
-      } else {
-        // 新建模式
-        submitData.id = Date.now()
-        submitData.created_at = new Date().toISOString().split('T')[0]
-        submitData.actual_cost = 0
-        emit('submit', submitData)
-        ElMessage.success('项目创建成功')
-      }
-
+      emit('submit', submitData)
       handleClose()
     } catch (error) {
       console.error('表单验证失败:', error)

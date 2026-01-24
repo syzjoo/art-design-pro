@@ -80,6 +80,8 @@ export interface TaskItem {
   start_date: string
   end_date: string
   created_at: string
+  achievement?: string
+  attachments?: any[]
 }
 
 // 任务列表查询参数

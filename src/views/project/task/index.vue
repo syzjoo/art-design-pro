@@ -21,7 +21,6 @@
             <el-icon><Plus /></el-icon>
             创建任务
           </ElButton>
-          <ElButton type="success" @click="handleBatchComplete" v-ripple>批量完成</ElButton>
           <ElButton type="danger" @click="handleBatchDelete" v-ripple>批量删除</ElButton>
         </template>
         <template #right>
@@ -56,20 +55,25 @@
           style="transition: opacity 0.3s ease"
         >
           <template #status="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
+            <el-tag :type="getStatusType(row?.status || '')">{{
+              getStatusText(row?.status || '')
+            }}</el-tag>
           </template>
           <template #priority="{ row }">
-            <el-tag :type="getPriorityType(row.priority)">{{
-              getPriorityText(row.priority)
+            <el-tag :type="getPriorityType(row?.priority || '')">{{
+              getPriorityText(row?.priority || '')
             }}</el-tag>
           </template>
           <template #progress="{ row }">
-            <el-progress :percentage="row.progress" :color="getProgressColor(row.progress)" />
+            <el-progress
+              :percentage="row?.progress || 0"
+              :color="getProgressColor(row?.progress || 0)"
+            />
           </template>
           <template #assignee="{ row }">
             <div class="flex items-center gap-2">
-              <el-avatar :size="32">{{ row.assignee.charAt(0) }}</el-avatar>
-              <span>{{ row.assignee }}</span>
+              <el-avatar :size="32">{{ (row?.assignee || '').charAt(0) }}</el-avatar>
+              <span>{{ row?.assignee || '未分配' }}</span>
             </div>
           </template>
           <template #action="{ row }">
@@ -108,20 +112,20 @@
                   @click="handleViewDetail(task)"
                 >
                   <div class="flex items-start justify-between mb-2">
-                    <span class="font-medium">{{ task.name }}</span>
-                    <el-tag :type="getPriorityType(task.priority)" size="small">
-                      {{ getPriorityText(task.priority) }}
+                    <span class="font-medium">{{ task?.name || '' }}</span>
+                    <el-tag :type="getPriorityType(task?.priority || '')" size="small">
+                      {{ getPriorityText(task?.priority || '') }}
                     </el-tag>
                   </div>
-                  <div class="text-sm text-g-600 mb-2">{{ task.description }}</div>
+                  <div class="text-sm text-g-600 mb-2">{{ task?.description || '' }}</div>
                   <div class="flex items-center gap-2 text-sm text-g-500">
-                    <el-avatar :size="24">{{ task.assignee.charAt(0) }}</el-avatar>
-                    <span>{{ task.assignee }}</span>
+                    <el-avatar :size="24">{{ (task?.assignee || '').charAt(0) }}</el-avatar>
+                    <span>{{ task?.assignee || '未分配' }}</span>
                   </div>
                   <div class="mt-2">
                     <el-progress
-                      :percentage="task.progress"
-                      :color="getProgressColor(task.progress)"
+                      :percentage="task?.progress || 0"
+                      :color="getProgressColor(task?.progress || 0)"
                       :stroke-width="6"
                     />
                   </div>
@@ -156,14 +160,15 @@
   import { Plus, List, Grid } from '@element-plus/icons-vue'
   import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
   import type { ColumnOption } from '@/types/component'
-  import type { TaskItem, ProjectItem } from '@/types/api/project'
+  import type { TaskItemWithDependencies, ProjectItem } from '@/types/api/project'
   import {
     getTaskList,
     getProjectList,
     createTask,
     updateTask,
     deleteTask,
-    batchDeleteTasks
+    batchDeleteTasks,
+    completeTask
   } from '@/api/project'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import TaskForm from './modules/TaskForm.vue'
@@ -175,8 +180,8 @@
   const viewMode = ref<'list' | 'kanban'>('list')
   const dialogVisible = ref(false)
   const detailVisible = ref(false)
-  const editTaskData = ref<TaskItem | undefined>(undefined)
-  const selectedTask = ref<TaskItem>({
+  const editTaskData = ref<TaskItemWithDependencies | undefined>(undefined)
+  const selectedTask = ref<TaskItemWithDependencies>({
     id: 0,
     name: '',
     description: '',
@@ -188,7 +193,8 @@
     project_name: '',
     start_date: '',
     end_date: '',
-    created_at: ''
+    created_at: '',
+    dependencies: []
   })
   const tableRef = ref<any>(null)
 
@@ -276,7 +282,7 @@
     }
   ])
 
-  const taskList = ref<TaskItem[]>([])
+  const taskList = ref<TaskItemWithDependencies[]>([])
   const columns = ref<ColumnOption[]>([
     { type: 'selection', width: 55 },
     { prop: 'name', label: '任务名称', width: 200, sortable: true },
@@ -374,7 +380,7 @@
   }
 
   const getTasksByStatus = (status: string) => {
-    return taskList.value.filter((task) => task.status === status)
+    return taskList.value.filter((task) => task && task.status === status)
   }
 
   const handleSearch = () => {
@@ -404,16 +410,19 @@
       }
 
       const response = await getTaskList(params)
-
-      if (response.code === 200) {
-        taskList.value = response.data.data
-        pagination.total = response.data.total
+      // 直接使用返回的数据，因为HTTP工具已经处理了响应结构
+      if (response && response.data && Array.isArray(response.data)) {
+        taskList.value = response.data
+        pagination.total = response.total || 0
       } else {
-        ElMessage.error(`获取任务列表失败: ${response.message}`)
+        taskList.value = []
+        pagination.total = 0
       }
     } catch (error) {
       console.error('获取任务列表失败:', error)
       ElMessage.error('获取任务列表失败，请稍后重试')
+      taskList.value = []
+      pagination.total = 0
     } finally {
       loading.value = false
     }
@@ -424,23 +433,29 @@
     dialogVisible.value = true
   }
 
-  const handleViewDetail = (row: TaskItem) => {
+  const handleViewDetail = (row: TaskItemWithDependencies) => {
     selectedTask.value = { ...row }
     detailVisible.value = true
   }
 
-  const handleEdit = (row: TaskItem) => {
+  const handleEdit = (row: TaskItemWithDependencies) => {
     editTaskData.value = { ...row }
     dialogVisible.value = true
   }
 
-  const handleDelete = async (row: TaskItem) => {
+  const handleDelete = async (row: TaskItemWithDependencies) => {
     try {
+      // 检查任务状态，如果已完成则禁止删除
+      if (row.status === 'completed') {
+        ElMessage.warning('已完成的任务禁止删除')
+        return
+      }
+
       await ElMessageBox.confirm(`确定要删除任务「${row.name}」吗？`, '提示', {
         type: 'warning'
       })
       await deleteTask(row.id)
-      const index = taskList.value.findIndex((t: TaskItem) => t.id === row.id)
+      const index = taskList.value.findIndex((t: TaskItemWithDependencies) => t.id === row.id)
       if (index > -1) {
         taskList.value.splice(index, 1)
         pagination.total = taskList.value.length
@@ -457,51 +472,31 @@
     }
   }
 
-  const handleFormSubmit = async (data: TaskItem) => {
+  const handleFormSubmit = async (data: TaskItemWithDependencies) => {
     try {
-      if (data.id) {
-        const response = await updateTask(data.id, data)
-        const index = taskList.value.findIndex((t: TaskItem) => t.id === data.id)
-        if (index > -1) {
-          taskList.value[index] = response.data
+      if (data.id && data.id < 10000) {
+        // 编辑模式（ID 是数据库生成的小数字）
+        const updatedTask = await updateTask(data.id, data)
+        if (updatedTask) {
+          const index = taskList.value.findIndex((t: TaskItemWithDependencies) => t.id === data.id)
+          if (index > -1) {
+            taskList.value[index] = updatedTask
+          }
+          ElMessage.success('任务更新成功')
         }
-        ElMessage.success('任务更新成功')
       } else {
-        const response = await createTask(data)
-        taskList.value.unshift(response.data)
-        pagination.total++
-        ElMessage.success('任务创建成功')
+        // 新建模式（ID 是时间戳或不存在）
+        const newTask = await createTask(data)
+        if (newTask) {
+          taskList.value.unshift(newTask)
+          pagination.total++
+          ElMessage.success('任务创建成功')
+        }
       }
       handleRefresh()
     } catch (error) {
       ElMessage.error('操作失败')
       console.error('任务操作失败:', error)
-    }
-  }
-
-  const handleBatchComplete = async () => {
-    const selectedRows = tableRef.value?.elTableRef?.getSelectionRows() || []
-    if (selectedRows.length === 0) {
-      ElMessage.warning('请先选择要完成的任务')
-      return
-    }
-    try {
-      await ElMessageBox.confirm(`确定要完成选中的 ${selectedRows.length} 个任务吗？`, '提示', {
-        type: 'info'
-      })
-      // 逐个更新任务状态
-      for (const row of selectedRows) {
-        await updateTask(row.id, row as any)
-      }
-      ElMessage.success('批量完成成功')
-      handleRefresh()
-    } catch (error) {
-      if (error !== 'cancel') {
-        ElMessage.error('批量完成失败')
-        console.error('批量完成失败:', error)
-      } else {
-        ElMessage.info('已取消操作')
-      }
     }
   }
 
@@ -511,6 +506,18 @@
       ElMessage.warning('请先选择要删除的任务')
       return
     }
+
+    // 检查选中的任务是否有已完成的任务
+    const completedTasks = selectedRows.filter(
+      (r: TaskItemWithDependencies) => r.status === 'completed'
+    )
+    if (completedTasks.length > 0) {
+      ElMessage.warning(
+        `选中的任务中有 ${completedTasks.length} 个已完成的任务，已完成的任务禁止删除`
+      )
+      return
+    }
+
     try {
       await ElMessageBox.confirm(
         `确定要删除选中的 ${selectedRows.length} 个任务吗？删除后将无法恢复！`,
@@ -519,7 +526,7 @@
           type: 'warning'
         }
       )
-      const ids = selectedRows.map((r: TaskItem) => r.id)
+      const ids = selectedRows.map((r: TaskItemWithDependencies) => r.id)
       await batchDeleteTasks(ids)
       ElMessage.success('批量删除成功')
       handleRefresh()
@@ -533,14 +540,11 @@
     }
   }
 
-  const handleCompleteTask = async (taskId: number) => {
+  const handleCompleteTask = async (taskId: number, achievement?: string, attachments?: any[]) => {
     try {
-      const task = taskList.value.find((t) => t.id === taskId)
-      if (task) {
-        await updateTask(taskId, { ...task, status: 'completed', progress: 100 })
-        ElMessage.success('任务已完成')
-        handleRefresh()
-      }
+      await completeTask(taskId, { achievement, attachments })
+      ElMessage.success('任务已完成')
+      handleRefresh()
     } catch (error) {
       ElMessage.error('操作失败')
       console.error('任务完成失败:', error)
@@ -558,7 +562,7 @@
     }
   }
 
-  const handleUpdateTask = async (data: TaskItem) => {
+  const handleUpdateTask = async (data: TaskItemWithDependencies) => {
     try {
       await updateTask(data.id, data)
       ElMessage.success('任务已更新')
@@ -581,11 +585,19 @@
 
   const loadProjects = async () => {
     try {
+      // 获取所有项目
       const response = await getProjectList()
-      projectList.value = response.data.data
+
+      // 处理 API 响应
+      if (response && response.data && Array.isArray(response.data)) {
+        projectList.value = response.data
+      } else {
+        projectList.value = []
+      }
     } catch (error) {
-      ElMessage.error('获取项目列表失败')
       console.error('获取项目列表失败:', error)
+      ElMessage.error('获取项目列表失败')
+      projectList.value = []
     }
   }
 

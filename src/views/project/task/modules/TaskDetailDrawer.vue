@@ -87,6 +87,32 @@
         <div class="text-sm text-g-600 mb-2">创建时间</div>
         <div class="font-medium">{{ taskData.created_at }}</div>
       </div>
+
+      <!-- 成果描述和附件，仅当任务已完成时显示 -->
+      <template v-if="taskData.status === 'completed'">
+        <el-divider />
+
+        <div class="mt-6">
+          <div class="text-sm text-g-600 mb-2">成果描述</div>
+          <div class="font-medium bg-gray-50 p-4 rounded-md" v-html="taskData.achievement || '无'">
+          </div>
+        </div>
+
+        <div class="mt-6" v-if="taskData.attachments && taskData.attachments.length > 0">
+          <div class="text-sm text-g-600 mb-3">成果附件</div>
+          <div class="flex flex-wrap gap-3">
+            <el-tag
+              v-for="(file, index) in taskData.attachments"
+              :key="index"
+              class="cursor-pointer"
+              @click="handleAttachmentClick(file)"
+            >
+              <el-icon><Document /></el-icon>
+              {{ file.name || `附件${index + 1}` }}
+            </el-tag>
+          </div>
+        </div>
+      </template>
     </div>
 
     <template #footer>
@@ -137,7 +163,8 @@
     Clock,
     Edit,
     Check,
-    Delete
+    Delete,
+    Document
   } from '@element-plus/icons-vue'
   import type { TaskItem } from '@/types/api/project'
   import TaskForm from './TaskForm.vue'
@@ -172,7 +199,7 @@
 
   const emit = defineEmits<{
     (e: 'update:visible', value: boolean): void
-    (e: 'complete', taskId: number): void
+    (e: 'complete', taskId: number, achievement: string, attachments: any[]): void
     (e: 'delete', taskId: number): void
     (e: 'update', data: TaskItem): void
   }>()
@@ -255,13 +282,19 @@
     attachments: any[]
   }) => {
     console.log('任务完成提交:', data)
-    emit('complete', data.taskId)
+    emit('complete', data.taskId, data.achievement, data.attachments)
     ElMessage.success('任务已标记为完成')
     handleClose()
   }
 
   const handleDelete = async () => {
     try {
+      // 检查任务状态，如果已完成则禁止删除
+      if (props.taskData.status === 'completed') {
+        ElMessage.warning('已完成的任务禁止删除')
+        return
+      }
+
       await ElMessageBox.confirm(
         `确定要删除任务「${props.taskData.name}」吗？删除后将无法恢复！`,
         '警告',
@@ -281,6 +314,13 @@
     emit('update', data)
     formVisible.value = false
     ElMessage.success('任务更新成功')
+  }
+
+  // 处理附件点击事件
+  const handleAttachmentClick = (file: any) => {
+    console.log('附件点击:', file)
+    // 这里可以添加附件下载或预览逻辑
+    ElMessage.info('附件功能开发中...')
   }
 
   watch(

@@ -7,7 +7,25 @@
     <ElTable
       ref="elTableRef"
       v-loading="!!loading"
-      v-bind="{ ...$attrs, ...props, height, stripe, border, size, headerCellStyle }"
+      v-bind="{
+        ...props,
+        height,
+        stripe,
+        border,
+        size,
+        headerCellStyle,
+        data: props.data
+      }"
+      @row-click="
+        (row, column, event) => {
+          emit('row-click', row, column, event)
+        }
+      "
+      @selection-change="
+        (selection) => {
+          emit('selection-change', selection)
+        }
+      "
     >
       <template v-for="col in columns" :key="col.prop || col.type">
         <!-- 渲染全局序号列 -->
@@ -291,11 +309,13 @@
     return (current - 1) * size + index + 1
   }
 
+  // 使用剩余事件传递机制，允许所有事件通过
   const emit = defineEmits<{
     (e: 'pagination:size-change', val: number): void
     (e: 'pagination:current-change', val: number): void
+    (e: 'row-click', row: any, column: any, event: any): void
+    (e: 'selection-change', selection: any[]): void
   }>()
-
   // 查找并绑定表格头部元素 - 使用 VueUse 优化
   const findTableHeader = () => {
     if (!props.showTableHeader) {

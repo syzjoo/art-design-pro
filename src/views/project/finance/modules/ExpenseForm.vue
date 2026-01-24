@@ -16,13 +16,22 @@
         />
       </ElFormItem>
 
-      <ElFormItem label="项目" prop="project_name">
-        <ElSelect v-model="formData.project_name" placeholder="选择项目" style="width: 100%">
+      <ElFormItem label="项目" prop="project_id">
+        <ElSelect
+          v-model="formData.project_id"
+          placeholder="选择项目"
+          style="width: 100%"
+          filterable
+          remote
+          reserve-keyword
+          :remote-method="handleRemoteSearch"
+          :loading="projectLoading"
+        >
           <ElOption
             v-for="project in projectList"
-            :key="project.name"
+            :key="project.id"
             :label="project.name"
-            :value="project.name"
+            :value="project.id"
           />
         </ElSelect>
       </ElFormItem>
@@ -65,8 +74,11 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, computed } from 'vue'
+  import { ref, computed, watch } from 'vue'
   import type { FormInstance } from 'element-plus'
+
+  import { getProjectList } from '@/api/project'
+  import type { ProjectItem } from '@/types/api/project'
 
   defineOptions({ name: 'ExpenseForm' })
 
@@ -94,7 +106,7 @@
 
   interface FormData {
     date: string
-    project_name: string
+    project_id: number
     type: string
     description: string
     amount: number
@@ -104,7 +116,7 @@
 
   const formData = ref<FormData>({
     date: new Date().toISOString().split('T')[0],
-    project_name: '',
+    project_id: 0,
     type: 'expense',
     description: '',
     amount: 0
@@ -112,32 +124,51 @@
 
   const rules = {
     date: [{ required: true, message: '请选择日期', trigger: 'change' }],
-    project_name: [{ required: true, message: '请选择项目', trigger: 'change' }],
+    project_id: [{ required: true, message: '请选择项目', trigger: 'change' }],
     type: [{ required: true, message: '请选择费用类型', trigger: 'change' }],
     description: [{ required: true, message: '请输入描述', trigger: 'blur' }],
     amount: [{ required: true, message: '请输入金额', trigger: 'blur' }]
   }
 
   // 项目列表
-  const projectList = [
-    { name: '电商平台重构' },
-    { name: '移动应用开发' },
-    { name: '客户管理系统' },
-    { name: '企业官网建设' },
-    { name: '云服务迁移' }
-  ]
+  const projectList = ref<ProjectItem[]>([])
+  const projectLoading = ref(false)
+
+  // 获取项目列表
+  const loadProjects = async (keyword = '') => {
+    projectLoading.value = true
+    try {
+      const response = await getProjectList({ keyword })
+      projectList.value = response.data
+    } catch (error) {
+      console.error('获取项目列表失败:', error)
+      projectList.value = []
+    } finally {
+      projectLoading.value = false
+    }
+  }
+
+  // 远程搜索项目
+  const handleRemoteSearch = (keyword: string) => {
+    loadProjects(keyword)
+  }
 
   // 监听 expenseData 变化，更新表单
-  import { watch } from 'vue'
   watch(
     () => props.expenseData,
     (newVal) => {
       if (newVal) {
-        formData.value = { ...newVal }
+        // 在编辑模式下，根据project_name查找对应的project_id
+        const project = projectList.value.find((p) => p.name === newVal.project_name)
+        formData.value = {
+          ...newVal,
+          project_id: project?.id || 0,
+          amount: Math.abs(newVal.amount) // 转换为正数显示
+        }
       } else {
         formData.value = {
           date: new Date().toISOString().split('T')[0],
-          project_name: '',
+          project_id: 0,
           type: 'expense',
           description: '',
           amount: 0
@@ -145,6 +176,16 @@
       }
     },
     { immediate: true }
+  )
+
+  // 监听表单可见性变化，加载项目列表
+  watch(
+    () => props.visible,
+    (newVal) => {
+      if (newVal) {
+        loadProjects()
+      }
+    }
   )
 
   const handleSubmit = async () => {

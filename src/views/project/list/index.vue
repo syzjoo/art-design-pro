@@ -35,14 +35,20 @@
         stripe
         border
         :pagination="pagination"
-        @row-click="handleRowClick"
         @selection-change="handleSelectionChange"
         @pagination:size-change="handleSizeChange"
         @pagination:current-change="handlePageChange"
         style="transition: opacity 0.3s ease"
+        :height="tableHeight"
       >
         <template #status="{ row }">
-          <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
+          <el-tag
+            :type="getStatusType(row.status)"
+            :effect="row.status === 'completed' ? 'dark' : 'plain'"
+            :class="{ 'archived-tag': row.status === 'completed' }"
+          >
+            {{ getStatusText(row.status) }}
+          </el-tag>
         </template>
         <template #priority="{ row }">
           <el-tag :type="getPriorityType(row.priority)">{{ getPriorityText(row.priority) }}</el-tag>
@@ -67,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, computed, onMounted } from 'vue'
+  import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
   import { Plus } from '@element-plus/icons-vue'
   import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
   import { useRouter } from 'vue-router'
@@ -78,7 +84,14 @@
     ProjectStatus,
     ProjectPriority
   } from '@/types/api/project'
-  import { getProjectList, archiveProject } from '@/api/project'
+  import {
+    getProjectList,
+    archiveProject,
+    createProject,
+    updateProject,
+    deleteProject,
+    batchDeleteProjects
+  } from '@/api/project'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import ProjectForm from './modules/ProjectForm.vue'
 
@@ -90,6 +103,25 @@
   const selectedProjects = ref<ProjectItem[]>([])
   const dialogVisible = ref(false)
   const editProjectData = ref<ProjectItem>()
+
+  // 表格高度计算
+  const tableHeight = ref('')
+
+  const calculateTableHeight = () => {
+    const searchBarHeight = 60 // 搜索栏高度
+    const tableHeaderHeight = 50 // 表格头部高度
+    const paginationHeight = 40 // 分页高度
+    const padding = 20 // 内边距
+    const windowHeight = window.innerHeight
+    const headerHeight = 60 // 顶部导航栏高度
+    const footerHeight = 40 // 底部高度
+
+    const availableHeight = windowHeight - headerHeight - footerHeight - padding
+    const calculatedHeight =
+      availableHeight - searchBarHeight - tableHeaderHeight - paginationHeight - padding
+
+    tableHeight.value = `${Math.max(calculatedHeight, 400)}px` // 最小高度400px
+  }
 
   const initialSearchState = {
     keyword: '',
@@ -274,12 +306,9 @@
       }
 
       const response = await getProjectList(params)
-      if (response.code === 200) {
-        projectList.value = response.data.data
-        pagination.total = response.data.total
-      } else {
-        ElMessage.error(`获取项目列表失败: ${response.message}`)
-      }
+      // 直接使用返回的数据，因为HTTP工具已经返回了res.data.data
+      projectList.value = response.data
+      pagination.total = response.total
     } catch (error) {
       console.error('获取项目列表失败:', error)
       ElMessage.error('获取项目列表失败，请稍后重试')
@@ -294,7 +323,7 @@
   }
 
   const handleViewDetail = (row: ProjectItem) => {
-    router.push({ name: 'ProjectDetail', params: { id: row.id.toString() } })
+    router.push({ path: `/project/detail/${row.id}` })
   }
 
   const handleEdit = (row: ProjectItem) => {
@@ -309,28 +338,52 @@
         cancelButtonText: '取消',
         type: 'warning'
       })
+
+      // 调用后端API删除项目
+      await deleteProject(row.id)
+
+      // 更新本地状态
       const index = projectList.value.findIndex((item: ProjectItem) => item.id === row.id)
       if (index > -1) {
         projectList.value.splice(index, 1)
         pagination.total = projectList.value.length
       }
       ElMessage.success('删除成功')
-    } catch {
-      ElMessage.info('已取消删除')
+    } catch (error) {
+      if (error !== 'cancel') {
+        console.error('删除项目失败:', error)
+        ElMessage.error('删除失败，请稍后重试')
+      } else {
+        ElMessage.info('已取消删除')
+      }
     }
   }
 
-  const handleFormSubmit = (data: ProjectItem) => {
-    if (data.id) {
-      // 编辑模式
-      const index = projectList.value.findIndex((item: ProjectItem) => item.id === data.id)
-      if (index > -1) {
-        projectList.value[index] = data
+  const handleFormSubmit = async (data: ProjectItem) => {
+    try {
+      loading.value = true
+
+      // 准备提交数据，确保状态值与后端匹配
+      // 解构出不需要的字段，创建新对象
+      const { ...submitData } = data
+
+      if (data.id) {
+        // 编辑模式
+        await updateProject(data.id, submitData)
+        ElMessage.success('项目更新成功')
+      } else {
+        // 新建模式
+        await createProject(submitData)
+        ElMessage.success('项目创建成功')
       }
-    } else {
-      // 新建模式
-      projectList.value.unshift(data)
-      pagination.total = projectList.value.length
+
+      // 刷新项目列表
+      await handleRefresh()
+    } catch (error) {
+      console.error('项目操作失败:', error)
+      ElMessage.error('操作失败，请稍后重试')
+    } finally {
+      loading.value = false
     }
   }
 
@@ -357,14 +410,14 @@
       loading.value = true
 
       const archivePromises = selectedProjects.value.map(async (project) => {
-        const response = await archiveProject(project.id)
-        if (response.code === 200) {
+        const success = await archiveProject(project.id)
+        if (success) {
           const index = projectList.value.findIndex((item: ProjectItem) => item.id === project.id)
           if (index > -1) {
             projectList.value[index].status = 'completed'
           }
         }
-        return response
+        return success
       })
 
       await Promise.all(archivePromises)
@@ -400,7 +453,13 @@
           type: 'warning'
         }
       )
+
       const idsToDelete = selectedProjects.value.map((p) => p.id)
+
+      // 调用后端API批量删除项目
+      await batchDeleteProjects(idsToDelete)
+
+      // 更新本地状态
       projectList.value = projectList.value.filter((item) => !idsToDelete.includes(item.id))
       pagination.total = projectList.value.length
       selectedProjects.value = []
@@ -416,10 +475,6 @@
     }
   }
 
-  const handleRowClick = (row: ProjectItem) => {
-    handleViewDetail(row)
-  }
-
   const handleSizeChange = (val: number) => {
     pagination.size = val
   }
@@ -429,6 +484,41 @@
   }
 
   onMounted(() => {
+    calculateTableHeight()
+    window.addEventListener('resize', calculateTableHeight)
     handleRefresh()
   })
+
+  onUnmounted(() => {
+    window.removeEventListener('resize', calculateTableHeight)
+  })
 </script>
+
+<style scoped lang="scss">
+  .project-page {
+    .search-bar {
+      margin-bottom: 16px;
+    }
+
+    .art-table-card {
+      border-radius: 8px;
+    }
+  }
+
+  .archived-tag {
+    position: relative;
+
+    &::after {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      padding: 2px 4px;
+      font-size: 10px;
+      line-height: 1;
+      color: white;
+      content: '归档';
+      background: var(--el-color-warning);
+      border-radius: 8px;
+    }
+  }
+</style>
