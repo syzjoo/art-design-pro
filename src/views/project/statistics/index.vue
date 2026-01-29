@@ -34,18 +34,28 @@
           刷新数据
         </ElButton>
 
-        <ElButton @click="handleExport">
-          <el-icon><Download /></el-icon>
-          导出报告
-        </ElButton>
+        <ElDropdown @command="handleExport">
+          <ElButton>
+            <el-icon><Download /></el-icon>
+            导出报告
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </ElButton>
+          <template #dropdown>
+            <ElDropdownMenu>
+              <ElDropdownItem command="excel">导出Excel</ElDropdownItem>
+              <ElDropdownItem command="pdf">导出PDF</ElDropdownItem>
+            </ElDropdownMenu>
+          </template>
+        </ElDropdown>
       </div>
     </div>
 
     <!-- 关键指标卡片 -->
     <div class="mb-6">
       <ElRow :gutter="20" class="flex">
-        <ElCol v-for="(item, index) in cardDataList" :key="index" :sm="12" :md="6" :lg="6">
+        <ElCol v-for="(item, index) in cardDataList" :key="index" :xs="24" :sm="12" :md="6" :lg="6">
           <div
+            v-if="!loading"
             class="art-card relative flex flex-col justify-center h-35 px-5 mb-5 max-sm:mb-4 hover:shadow-md transition-shadow"
           >
             <span class="text-g-700 text-sm">{{ item.des }}</span>
@@ -66,6 +76,9 @@
               <ArtSvgIcon :icon="item.icon" :style="{ color: item.color, fontSize: '20px' }" />
             </div>
           </div>
+          <div v-else class="art-card h-35 px-5 mb-5 max-sm:mb-4">
+            <ElSkeleton :rows="3" animated />
+          </div>
         </ElCol>
       </ElRow>
     </div>
@@ -74,8 +87,8 @@
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-4">财务概览</h2>
       <ElRow :gutter="20">
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
+        <ElCol :xs="24" :sm="24" :md="12" :lg="12">
+          <div v-if="!loading" class="art-card p-5 h-full">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">预算使用情况</h3>
               <el-button type="text" size="small" @click="showBudgetDetail = true">
@@ -88,13 +101,13 @@
               <div class="text-3xl font-bold mt-1">¥{{ formatNumber(totalBudget) }}</div>
               <div class="text-sm text-g-600 mt-1">
                 已使用: ¥{{ formatNumber(totalActualCost) }} ({{
-                  ((totalActualCost / totalBudget) * 100).toFixed(1)
+                  totalBudget > 0 ? ((totalActualCost / totalBudget) * 100).toFixed(1) : '0.0'
                 }}%)
               </div>
             </div>
 
             <el-progress
-              :percentage="(totalActualCost / totalBudget) * 100"
+              :percentage="totalBudget > 0 ? (totalActualCost / totalBudget) * 100 : 0"
               :color="getBudgetColor(totalActualCost, totalBudget)"
               :stroke-width="24"
             />
@@ -115,15 +128,20 @@
               <div class="text-center">
                 <div class="text-sm text-g-600">预算使用率</div>
                 <div class="text-lg font-medium"
-                  >{{ ((totalActualCost / totalBudget) * 100).toFixed(1) }}%</div
+                  >{{
+                    totalBudget > 0 ? ((totalActualCost / totalBudget) * 100).toFixed(1) : '0.0'
+                  }}%</div
                 >
               </div>
             </div>
           </div>
+          <div v-else class="art-card p-5 h-full">
+            <ElSkeleton :rows="6" animated />
+          </div>
         </ElCol>
 
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
+        <ElCol :xs="24" :sm="24" :md="12" :lg="12">
+          <div v-if="!loading" class="art-card p-5 h-full">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">财务收支分析</h3>
               <el-button type="text" size="small" @click="showFinanceDetail = true">
@@ -131,32 +149,88 @@
               </el-button>
             </div>
 
-            <div class="grid grid-cols-2 gap-4 mb-4">
-              <div class="text-center p-3 bg-success/5 rounded-lg">
-                <div class="text-sm text-g-600">总收入</div>
-                <div class="text-2xl font-bold text-success mt-1"
-                  >¥{{ formatNumber(totalRevenue) }}</div
-                >
-                <div class="text-xs text-success mt-1">
-                  <el-icon class="mr-1"><TrendCharts /></el-icon>
-                  较上月 +12.5%
+            <div class="space-y-4 mb-4">
+              <!-- 第一行：总收入、总支出、净利润 -->
+              <div class="grid grid-cols-3 gap-4 h-40">
+                <!-- 总收入 -->
+                <div class="text-center p-3 bg-success/5 rounded-lg flex flex-col justify-center">
+                  <div class="text-sm text-g-600">总收入</div>
+                  <div class="text-2xl font-bold text-success my-2"
+                    >¥{{ formatNumber(totalRevenue) }}</div
+                  >
+                  <div class="text-xs text-success">
+                    <el-icon class="mr-1"><TrendCharts /></el-icon>
+                    较上月 +12.5%
+                  </div>
+                </div>
+
+                <!-- 总支出 -->
+                <div class="text-center p-3 bg-danger/5 rounded-lg flex flex-col justify-center">
+                  <div class="text-sm text-g-600">总支出</div>
+                  <div class="text-2xl font-bold text-danger my-2"
+                    >¥{{ formatNumber(totalActualCost) }}</div
+                  >
+                  <div class="text-xs text-danger">
+                    <el-icon class="mr-1"><TrendCharts /></el-icon>
+                    较上月 +8.2%
+                  </div>
+                </div>
+
+                <!-- 净利润 -->
+                <div class="text-center p-3 bg-primary/5 rounded-lg flex flex-col justify-center">
+                  <div class="text-sm text-g-600">净利润</div>
+                  <div class="text-2xl font-bold text-primary my-2"
+                    >¥{{ formatNumber(totalRevenue - totalActualCost) }}</div
+                  >
+                  <div class="text-xs text-primary">
+                    <el-icon class="mr-1"><TrendCharts /></el-icon>
+                    利润率
+                    {{
+                      totalActualCost > 0
+                        ? (((totalRevenue - totalActualCost) / totalActualCost) * 100).toFixed(1)
+                        : '0.0'
+                    }}%
+                  </div>
                 </div>
               </div>
 
-              <div class="text-center p-3 bg-primary/5 rounded-lg">
-                <div class="text-sm text-g-600">净利润</div>
-                <div class="text-2xl font-bold text-primary mt-1"
-                  >¥{{ formatNumber(totalRevenue - totalActualCost) }}</div
-                >
-                <div class="text-xs text-primary mt-1">
-                  <el-icon class="mr-1"><Percentage /></el-icon>
-                  利润率
-                  {{ (((totalRevenue - totalActualCost) / totalActualCost) * 100).toFixed(1) }}%
+              <!-- 第二行：项目净利润排行 -->
+              <div class="bg-white rounded-lg border border-gray-100 p-4 h-40">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-medium">项目净利润排行</h4>
+                  <el-button type="text" size="small" @click="showProfitRankingDetail = true">
+                    详情 <el-icon class="ml-1"><ArrowRight /></el-icon>
+                  </el-button>
+                </div>
+                <div class="space-y-2 h-[calc(100%-40px)] overflow-y-auto pr-2">
+                  <div
+                    v-for="(item, index) in projectProfitRanking"
+                    :key="index"
+                    class="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
+                  >
+                    <div class="flex items-center">
+                      <div
+                        class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mr-2 text-primary font-medium"
+                      >
+                        {{ index + 1 }}
+                      </div>
+                      <div class="flex-1">
+                        <div class="font-medium">{{ item.name }}</div>
+                        <div class="text-xs text-g-600"> ¥{{ formatNumber(item.profit) }} </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="projectProfitRanking.length === 0" class="text-center text-g-600 py-4">
+                    暂无数据
+                  </div>
                 </div>
               </div>
             </div>
 
             <div ref="financeChart.chartRef" style="height: 200px"></div>
+          </div>
+          <div v-else class="art-card p-5 h-full">
+            <ElSkeleton :rows="8" animated />
           </div>
         </ElCol>
       </ElRow>
@@ -166,21 +240,29 @@
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-4">项目状态分析</h2>
       <ElRow :gutter="20">
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
+        <ElCol :xs="24" :sm="24" :md="12" :lg="12">
+          <div v-if="!loading" class="art-card p-5 h-full">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">项目状态分布</h3>
-              <ElSelect v-model="statusViewMode" placeholder="视图模式" @change="updateStatusChart">
+              <ElSelect
+                v-model="statusViewMode"
+                placeholder="视图模式"
+                @change="updateStatusChart"
+                style="width: 120px"
+              >
                 <ElOption label="饼图" value="pie" />
                 <ElOption label="条形图" value="bar" />
               </ElSelect>
             </div>
             <div ref="statusChart.chartRef" style="height: 300px"></div>
           </div>
+          <div v-else class="art-card p-5 h-full">
+            <ElSkeleton :rows="4" animated />
+          </div>
         </ElCol>
 
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
+        <ElCol :xs="24" :sm="24" :md="12" :lg="12">
+          <div v-if="!loading" class="art-card p-5 h-full">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">项目健康度分析</h3>
               <el-button type="text" size="small" @click="showHealthDetail = true">
@@ -215,34 +297,13 @@
                   />
                 </div>
               </div>
+              <div v-if="projectHealthList.length === 0" class="text-center text-g-600 py-4">
+                暂无数据
+              </div>
             </div>
           </div>
-        </ElCol>
-      </ElRow>
-    </div>
-
-    <!-- 资源利用和趋势分析 -->
-    <div class="mb-6">
-      <h2 class="text-xl font-semibold mb-4">资源利用与趋势</h2>
-      <ElRow :gutter="20">
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
-            <h3 class="font-medium mb-4">团队资源利用</h3>
-            <div ref="resourceChart.chartRef" style="height: 300px"></div>
-          </div>
-        </ElCol>
-
-        <ElCol :span="12">
-          <div class="art-card p-5 h-full">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="font-medium">项目趋势分析</h3>
-              <ElSelect v-model="trendType" placeholder="趋势类型" @change="updateTrendChart">
-                <ElOption label="项目数量" value="count" />
-                <ElOption label="完成率" value="completion" />
-                <ElOption label="预算执行" value="budget" />
-              </ElSelect>
-            </div>
-            <div ref="trendChart.chartRef" style="height: 300px"></div>
+          <div v-else class="art-card p-5 h-full">
+            <ElSkeleton :rows="6" animated />
           </div>
         </ElCol>
       </ElRow>
@@ -251,7 +312,7 @@
     <!-- 风险预警和建议 -->
     <div class="mb-6">
       <h2 class="text-xl font-semibold mb-4">风险预警与建议</h2>
-      <div class="art-card p-5">
+      <div v-if="!loading" class="art-card p-5">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <div class="flex items-center mb-3">
@@ -272,13 +333,14 @@
                   {{ getRiskLevelText(risk.level) }}
                 </div>
               </div>
+              <div v-if="riskList.length === 0" class="text-center text-g-600 py-4"> 暂无数据 </div>
             </div>
           </div>
 
           <div>
             <div class="flex items-center mb-3">
               <div class="size-8 rounded-full bg-info/10 flex-cc mr-2">
-                <el-icon class="text-info"><Lightbulb /></el-icon>
+                <el-icon class="text-info"><InfoFilled /></el-icon>
               </div>
               <h3 class="font-medium">优化建议</h3>
             </div>
@@ -293,6 +355,9 @@
                 <el-button type="text" size="small" class="mt-1 p-0">
                   查看详情 <el-icon class="ml-1"><ArrowRight /></el-icon>
                 </el-button>
+              </div>
+              <div v-if="suggestionList.length === 0" class="text-center text-g-600 py-4">
+                暂无数据
               </div>
             </div>
           </div>
@@ -320,9 +385,15 @@
                   <span class="text-xs text-g-600 ml-2">团队评分</span>
                 </div>
               </div>
+              <div v-if="excellentProjects.length === 0" class="text-center text-g-600 py-4">
+                暂无数据
+              </div>
             </div>
           </div>
         </div>
+      </div>
+      <div v-else class="art-card p-5">
+        <ElSkeleton :rows="12" animated />
       </div>
     </div>
 
@@ -433,56 +504,204 @@
         </ElTable>
       </div>
     </ElDialog>
+
+    <!-- 项目净利润排行详情弹窗 -->
+    <ElDialog v-model="showProfitRankingDetail" title="项目净利润排行详情" width="800px">
+      <div class="max-h-[500px] overflow-y-auto">
+        <ElTable :data="projectProfitRanking" style="width: 100%">
+          <ElTableColumn label="排名" width="80">
+            <template #default="{ $index }">
+              <div
+                class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mx-auto text-primary font-medium"
+              >
+                {{ $index + 1 }}
+              </div>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn prop="name" label="项目名称" width="200" />
+          <ElTableColumn label="总收入" width="150">
+            <template #default="{ row }"> ¥{{ formatNumber(row.revenue || 0) }} </template>
+          </ElTableColumn>
+          <ElTableColumn label="总支出" width="150">
+            <template #default="{ row }"> ¥{{ formatNumber(row.cost || 0) }} </template>
+          </ElTableColumn>
+          <ElTableColumn label="净利润" width="150">
+            <template #default="{ row }">
+              <div class="font-bold text-primary"> ¥{{ formatNumber(row.profit) }} </div>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="利润率" width="120">
+            <template #default="{ row }">
+              {{ row.cost > 0 ? ((row.profit / row.cost) * 100).toFixed(1) : '0.0' }}%
+            </template>
+          </ElTableColumn>
+        </ElTable>
+      </div>
+    </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, onMounted, watch } from 'vue'
+  import { ref, reactive, onMounted, watch, computed } from 'vue'
   import {
     Refresh,
     Download,
     ArrowRight,
     TrendCharts,
     Warning,
-    Trophy
+    Trophy,
+    InfoFilled,
+    ArrowDown
   } from '@element-plus/icons-vue'
-  import { ElMessage } from 'element-plus'
+  import { ElMessage, ElSkeleton, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
   import { useChart } from '@/hooks/core/useChart'
   import type { EChartsOption } from '@/plugins/echarts'
   import ArtCountTo from '@/components/core/text-effect/art-count-to/index.vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import { getProjectStatistics } from '@/api/project'
+
+  // TypeScript接口定义
+  interface ProjectStatistics {
+    totalProjects: number
+    activeProjects: number
+    completedProjects: number
+    overdueProjects: number
+    totalBudget: number
+    totalActualCost: number
+    totalRevenue: number
+    statusDistribution: {
+      in_progress: number
+      completed: number
+      pending: number
+      on_hold: number
+      cancelled: number
+    }
+    projectHealthList: ProjectHealth[]
+    projectProfitRanking: ProjectProfit[]
+    trendData: any[]
+    riskList: Risk[]
+    excellentProjects: ExcellentProject[]
+    suggestionList: Suggestion[]
+  }
+
+  interface ProjectHealth {
+    id: number
+    name: string
+    progress: number
+    healthScore: number
+    endDate: string
+    budget?: number
+    actualCost?: number
+    riskLevel?: string
+  }
+
+  interface ProjectProfit {
+    id?: number
+    name: string
+    revenue?: number
+    cost?: number
+    profit: number
+  }
+
+  interface Risk {
+    id: number
+    title: string
+    description: string
+    level: 'high' | 'medium' | 'low'
+  }
+
+  interface ExcellentProject {
+    id: number
+    name: string
+    onTimeRate: number
+    budgetDeviation: number
+    score: number
+  }
+
+  interface Suggestion {
+    id: number
+    title: string
+    description: string
+  }
+
+  interface DataCache {
+    lastParams: string | null
+    data: ProjectStatistics | null
+  }
 
   defineOptions({ name: 'ProjectStatistics' })
 
   // 响应式数据
   const loading = ref(false)
-  const dateRange = ref<any>([])
+  const dateRange = ref<[string, string]>(['', ''])
   const projectType = ref('')
-  const statusViewMode = ref('pie')
-  const trendType = ref('count')
+  const statusViewMode = ref<'pie' | 'bar'>('pie')
   const showBudgetDetail = ref(false)
   const showFinanceDetail = ref(false)
   const showHealthDetail = ref(false)
+  const showProfitRankingDetail = ref(false)
+
+  // 数据缓存
+  const dataCache = ref<DataCache>({
+    lastParams: null,
+    data: null
+  })
 
   // 图表引用
 
   // 图表实例 - 为每个图表创建独立实例
   const financeChart = useChart()
   const statusChart = useChart()
-  const resourceChart = useChart()
-  const trendChart = useChart()
 
   // 核心数据
-  const totalBudget = 2450000
-  const totalActualCost = 1260000
-  const totalRevenue = 1850000
+  const statisticsData = ref<ProjectStatistics>({
+    totalProjects: 0,
+    activeProjects: 0,
+    completedProjects: 0,
+    overdueProjects: 0,
+    totalBudget: 0,
+    totalActualCost: 0,
+    totalRevenue: 0,
+    statusDistribution: {
+      in_progress: 0,
+      completed: 0,
+      pending: 0,
+      on_hold: 0,
+      cancelled: 0
+    },
+    projectHealthList: [],
+    projectProfitRanking: [],
+    trendData: [],
+    riskList: [],
+    excellentProjects: [],
+    suggestionList: []
+  })
+
+  // 计算属性
+  /**
+   * 总预算
+   */
+  const totalBudget = computed(() => statisticsData.value.totalBudget || 0)
+
+  /**
+   * 总支出
+   */
+  const totalActualCost = computed(() => statisticsData.value.totalActualCost || 0)
+
+  /**
+   * 总收入
+   */
+  const totalRevenue = computed(() => statisticsData.value.totalRevenue || 0)
 
   // 卡片数据
-  const cardDataList = reactive([
+  /**
+   * 关键指标卡片数据
+   */
+  const cardDataList = computed(() => [
     {
       des: '总项目数',
       icon: 'ri:folder-chart-line',
-      num: 128,
+      num: statisticsData.value.totalProjects || 0,
       change: '+12',
       compareText: '较上月',
       color: '#409EFF'
@@ -490,7 +709,7 @@
     {
       des: '进行中',
       icon: 'ri:play-circle-line',
-      num: 45,
+      num: statisticsData.value.activeProjects || 0,
       change: '+8',
       compareText: '较上月',
       color: '#E6A23C'
@@ -498,7 +717,7 @@
     {
       des: '已完成',
       icon: 'ri:check-double-line',
-      num: 72,
+      num: statisticsData.value.completedProjects || 0,
       change: '+15',
       compareText: '较上月',
       color: '#67C23A'
@@ -506,7 +725,7 @@
     {
       des: '逾期项目',
       icon: 'ri:alert-line',
-      num: 11,
+      num: statisticsData.value.overdueProjects || 0,
       change: '-3',
       compareText: '较上月',
       color: '#F56C6C'
@@ -514,60 +733,30 @@
   ])
 
   // 项目预算数据
-  const projectBudgetList = reactive([
-    { id: 1, name: '电商平台重构', manager: '张三', budget: 500000, actual_cost: 350000 },
-    { id: 2, name: '移动应用开发', manager: '李四', budget: 800000, actual_cost: 280000 },
-    { id: 3, name: '数据分析系统', manager: '王五', budget: 600000, actual_cost: 0 },
-    { id: 4, name: '客户管理系统', manager: '赵六', budget: 400000, actual_cost: 380000 },
-    { id: 5, name: '云服务迁移', manager: '张三', budget: 300000, actual_cost: 150000 },
-    { id: 6, name: '企业官网建设', manager: '李四', budget: 150000, actual_cost: 100000 }
-  ])
+  /**
+   * 项目预算数据，用于预算详情弹窗
+   */
+  const projectBudgetList = computed(() => {
+    return statisticsData.value.projectHealthList.map((project: ProjectHealth) => ({
+      id: project.id,
+      name: project.name,
+      manager: '项目经理', // 模拟数据
+      budget: project.budget || 0,
+      actual_cost: project.actualCost || 0
+    }))
+  })
 
   // 项目健康度数据
-  const projectHealthList = reactive([
-    {
-      id: 1,
-      name: '电商平台重构',
-      progress: 75,
-      healthScore: 85,
-      riskLevel: 'low',
-      endDate: '2024-06-30',
-      budget: 500000,
-      actualCost: 350000
-    },
-    {
-      id: 2,
-      name: '移动应用开发',
-      progress: 60,
-      healthScore: 72,
-      riskLevel: 'medium',
-      endDate: '2024-07-15',
-      budget: 800000,
-      actualCost: 280000
-    },
-    {
-      id: 3,
-      name: '数据分析系统',
-      progress: 30,
-      healthScore: 65,
-      riskLevel: 'medium',
-      endDate: '2024-08-20',
-      budget: 600000,
-      actualCost: 0
-    },
-    {
-      id: 4,
-      name: '客户管理系统',
-      progress: 90,
-      healthScore: 92,
-      riskLevel: 'low',
-      endDate: '2024-05-10',
-      budget: 400000,
-      actualCost: 380000
-    }
-  ])
+  /**
+   * 项目健康度数据，用于项目健康度分析和详情弹窗
+   */
+  const projectHealthList = computed(() => statisticsData.value.projectHealthList)
 
   // 财务详情数据
+  /**
+   * 财务详情数据，用于财务详情弹窗
+   * 注意：这里使用的是模拟数据，实际项目中应该从后端API获取
+   */
   const financeDetailList = reactive([
     {
       id: 1,
@@ -644,43 +833,42 @@
   ])
 
   // 风险预警数据
-  const riskList = reactive([
-    {
-      id: 1,
-      title: '电商平台重构项目延期风险',
-      description: '项目进度滞后15%，可能无法按时交付',
-      level: 'medium'
-    },
-    {
-      id: 2,
-      title: '移动应用开发预算超支',
-      description: '当前支出已达预算的35%，但进度仅完成25%',
-      level: 'high'
-    },
-    {
-      id: 3,
-      title: '数据分析系统资源不足',
-      description: '团队成员同时参与多个项目，资源分配紧张',
-      level: 'low'
-    }
-  ])
+  /**
+   * 风险预警数据，用于风险预警与建议部分
+   */
+  const riskList = computed(() => statisticsData.value.riskList)
 
   // 优化建议数据
-  const suggestionList = reactive([
-    { id: 1, title: '优化资源分配', description: '建议重新评估团队成员工作量，合理分配资源' },
-    { id: 2, title: '加强预算监控', description: '建议每周审查预算执行情况，及时调整支出计划' },
-    { id: 3, title: '改进项目规划', description: '建议在项目启动前进行更详细的风险评估' }
-  ])
+  /**
+   * 优化建议数据，用于风险预警与建议部分
+   */
+  const suggestionList = computed(() => statisticsData.value.suggestionList)
 
   // 优秀项目数据
-  const excellentProjects = reactive([
-    { id: 1, name: '客户管理系统', onTimeRate: 95, budgetDeviation: -2, score: 5 },
-    { id: 2, name: '企业官网建设', onTimeRate: 100, budgetDeviation: 0, score: 4.5 },
-    { id: 3, name: '云服务迁移', onTimeRate: 85, budgetDeviation: -5, score: 4 }
-  ])
+  /**
+   * 优秀项目数据，用于风险预警与建议部分
+   */
+  const excellentProjects = computed(() => statisticsData.value.excellentProjects)
+
+  // 项目净利润排行
+  /**
+   * 项目净利润排行数据，用于财务收支分析部分
+   * 从后端API获取数据并按净利润排序
+   */
+  const projectProfitRanking = computed(() => {
+    // 从后端API获取数据
+    const projects = statisticsData.value.projectProfitRanking || []
+
+    // 确保数据格式正确并按净利润排序
+    return projects
+      .filter((project) => project && typeof project.profit === 'number')
+      .sort((a, b) => (b.profit || 0) - (a.profit || 0))
+      .slice(0, 5)
+  })
 
   // 方法
   const getBudgetColor = (actual: number, budget: number) => {
+    if (budget <= 0) return '#67C23A'
     const percentage = (actual / budget) * 100
     if (percentage > 100) return '#F56C6C'
     if (percentage > 80) return '#E6A23C'
@@ -710,31 +898,169 @@
     return levelMap[level as keyof typeof levelMap] || level
   }
 
-  const formatNumber = (num: number) => {
-    return num.toLocaleString()
+  const formatNumber = (num: any) => {
+    // 确保输入是数字类型
+    let numberValue = num
+    if (typeof num === 'string') {
+      // 处理可能的字符串拼接问题
+      if (num.includes('.')) {
+        // 只保留第一个小数点
+        const parts = num.split('.')
+        numberValue = parseFloat(`${parts[0]}.${parts.slice(1).join('')}`)
+      } else {
+        numberValue = parseFloat(num)
+      }
+    }
+    // 检查是否是有效数字
+    if (isNaN(numberValue)) {
+      return '0'
+    }
+    return numberValue.toLocaleString()
   }
 
   const handleDateChange = () => {
-    ElMessage.info('日期范围已更新')
     handleRefresh()
   }
 
   const handleFilterChange = () => {
-    ElMessage.info('筛选条件已更新')
     handleRefresh()
   }
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     loading.value = true
-    setTimeout(() => {
+    try {
+      const params: Record<string, string | number> = {}
+      if (dateRange.value && dateRange.value.length === 2) {
+        params.start_date = dateRange.value[0]
+        params.end_date = dateRange.value[1]
+      }
+      if (projectType.value) {
+        params.project_type = projectType.value
+      }
+
+      // 检查缓存
+      const paramsString = JSON.stringify(params)
+      if (dataCache.value.lastParams === paramsString && dataCache.value.data) {
+        // 使用缓存数据
+        statisticsData.value = dataCache.value.data
+        ElMessage.success('数据刷新成功（使用缓存）')
+        initCharts()
+      } else {
+        // 请求新数据
+        try {
+          const data = await getProjectStatistics(params)
+          // 验证数据结构
+          if (data && typeof data === 'object') {
+            statisticsData.value = data as ProjectStatistics
+            // 更新缓存
+            dataCache.value = {
+              lastParams: paramsString,
+              data: data as ProjectStatistics
+            }
+            ElMessage.success('数据刷新成功')
+            initCharts()
+          } else {
+            throw new Error('无效的数据结构')
+          }
+        } catch (apiError: any) {
+          console.error('API请求失败:', apiError)
+          let errorMessage = '获取统计数据失败，请稍后重试'
+          if (apiError.response) {
+            // 服务器返回错误状态码
+            const status = apiError.response.status
+            if (status === 401) {
+              errorMessage = '未授权，请重新登录'
+            } else if (status === 403) {
+              errorMessage = '无权限访问此资源'
+            } else if (status === 404) {
+              errorMessage = '请求的资源不存在'
+            } else if (status >= 500) {
+              errorMessage = '服务器内部错误，请稍后重试'
+            }
+          } else if (apiError.request) {
+            // 请求已发送但没有收到响应
+            errorMessage = '网络连接失败，请检查您的网络'
+          }
+          ElMessage.error(errorMessage)
+        }
+      }
+    } catch (error: any) {
+      console.error('处理数据时发生错误:', error)
+      ElMessage.error('处理数据时发生错误，请稍后重试')
+    } finally {
       loading.value = false
-      ElMessage.success('数据刷新成功')
-      initCharts()
-    }, 1000)
+    }
   }
 
-  const handleExport = () => {
-    ElMessage.info('报告导出功能开发中')
+  const handleExport = (format: string) => {
+    if (format === 'excel') {
+      // 实现Excel导出功能
+      exportToExcel()
+    } else if (format === 'pdf') {
+      // PDF导出功能开发中
+      ElMessage.info('PDF导出功能开发中')
+    }
+  }
+
+  const exportToExcel = () => {
+    // 准备导出数据
+    const exportData = {
+      title: '项目统计分析报告',
+      date: new Date().toLocaleString(),
+      summary: {
+        totalProjects: statisticsData.value.totalProjects || 0,
+        activeProjects: statisticsData.value.activeProjects || 0,
+        completedProjects: statisticsData.value.completedProjects || 0,
+        overdueProjects: statisticsData.value.overdueProjects || 0,
+        totalBudget: statisticsData.value.totalBudget || 0,
+        totalActualCost: statisticsData.value.totalActualCost || 0,
+        totalRevenue: statisticsData.value.totalRevenue || 0
+      },
+      projectRanking: projectProfitRanking.value,
+      projectHealth: projectHealthList.value
+    }
+
+    // 生成CSV内容
+    let csvContent = '项目统计分析报告\n'
+    csvContent += `生成日期: ${exportData.date}\n\n`
+
+    // 添加摘要信息
+    csvContent += '一、项目摘要\n'
+    csvContent += '项目总数,进行中,已完成,逾期项目\n'
+    csvContent += `${exportData.summary.totalProjects},${exportData.summary.activeProjects},${exportData.summary.completedProjects},${exportData.summary.overdueProjects}\n\n`
+
+    csvContent += '二、财务概览\n'
+    csvContent += '总预算,总支出,总收入,净利润\n'
+    const netProfit = exportData.summary.totalRevenue - exportData.summary.totalActualCost
+    csvContent += `${exportData.summary.totalBudget},${exportData.summary.totalActualCost},${exportData.summary.totalRevenue},${netProfit}\n\n`
+
+    // 添加项目净利润排行
+    csvContent += '三、项目净利润排行\n'
+    csvContent += '排名,项目名称,净利润\n'
+    exportData.projectRanking.forEach((project: any, index: number) => {
+      csvContent += `${index + 1},${project.name},${project.profit}\n`
+    })
+    csvContent += '\n'
+
+    // 添加项目健康度
+    csvContent += '四、项目健康度\n'
+    csvContent += '项目名称,健康度,进度\n'
+    exportData.projectHealth.forEach((project: any) => {
+      csvContent += `${project.name},${project.healthScore},${project.progress || 0}\n`
+    })
+
+    // 创建Blob对象并下载
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `项目统计分析报告_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    ElMessage.success('报告导出成功')
   }
 
   const viewProjectDetail = (projectId: number) => {
@@ -743,193 +1069,199 @@
 
   // 图表初始化
   const initCharts = () => {
-    initFinanceChart()
-    updateStatusChart()
-    initResourceChart()
-    updateTrendChart()
+    // 使用requestAnimationFrame实现延迟加载，提升页面性能
+    requestAnimationFrame(() => {
+      initFinanceChart()
+      updateStatusChart()
+    })
   }
 
   const initFinanceChart = () => {
     financeChart.initChart({
       tooltip: {
         trigger: 'axis',
-        axisPointer: { type: 'cross' }
+        axisPointer: { type: 'cross' },
+        formatter: function (params: any) {
+          let result = params[0].name + '<br/>'
+          params.forEach((item: any) => {
+            result += `${item.marker} ${item.seriesName}: ¥${item.value.toLocaleString()}<br/>`
+          })
+          return result
+        }
+      },
+      legend: {
+        data: ['收入', '支出'],
+        top: '0%'
       },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: ['1月', '2月', '3月', '4月', '5月', '6月']
+        data: ['1月', '2月', '3月', '4月', '5月', '6月'],
+        axisLabel: {
+          rotate: 0
+        }
       },
-      yAxis: { type: 'value' },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          formatter: '¥{value}'
+        }
+      },
+      animationDuration: 1000,
+      animationEasing: 'cubicOut',
       series: [
         {
           name: '收入',
           type: 'bar',
           data: [200000, 250000, 300000, 280000, 350000, 400000],
-          itemStyle: { color: '#67C23A' }
+          itemStyle: { color: '#67C23A' },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(103, 194, 58, 0.5)'
+            }
+          }
         },
         {
           name: '支出',
           type: 'bar',
           data: [150000, 180000, 200000, 220000, 250000, 280000],
-          itemStyle: { color: '#F56C6C' }
+          itemStyle: { color: '#F56C6C' },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(245, 108, 108, 0.5)'
+            }
+          }
         }
       ]
     })
   }
 
   const updateStatusChart = () => {
+    const statusData = [
+      {
+        value: statisticsData.value.statusDistribution?.in_progress || 0,
+        name: '进行中',
+        itemStyle: { color: '#409EFF' }
+      },
+      {
+        value: statisticsData.value.statusDistribution?.completed || 0,
+        name: '已完成',
+        itemStyle: { color: '#67C23A' }
+      },
+      {
+        value: statisticsData.value.statusDistribution?.pending || 0,
+        name: '未开始',
+        itemStyle: { color: '#909399' }
+      },
+      {
+        value: statisticsData.value.statusDistribution?.on_hold || 0,
+        name: '已暂停',
+        itemStyle: { color: '#E6A23C' }
+      },
+      {
+        value: statisticsData.value.statusDistribution?.cancelled || 0,
+        name: '已取消',
+        itemStyle: { color: '#F56C6C' }
+      }
+    ].filter((item) => item.value > 0)
+
+    // 检查是否为空数据
+    const isEmpty = statusData.length === 0
+
+    if (isEmpty) {
+      // 处理空数据情况
+      statusChart.initChart({}, true)
+      return
+    }
+
     const option: EChartsOption = {
       tooltip: {
         trigger: 'item',
-        formatter: '{b}: {c} ({d}%)'
+        formatter: function (params: any) {
+          return `${params.name}: ${params.value} (${params.percent}%)`
+        }
       },
       legend: {
-        orient: 'vertical',
-        left: 'left'
+        orient: statusViewMode.value === 'pie' ? 'vertical' : 'horizontal',
+        left: statusViewMode.value === 'pie' ? 'left' : 'center',
+        top: statusViewMode.value === 'pie' ? 'center' : '0%'
       },
+      animationDuration: 1000,
+      animationEasing: 'cubicOut',
       series: [
         {
           name: '项目状态',
           type: statusViewMode.value === 'pie' ? 'pie' : 'bar',
           radius: statusViewMode.value === 'pie' ? '55%' : undefined,
           center: statusViewMode.value === 'pie' ? ['50%', '60%'] : undefined,
-          data: [
-            { value: 45, name: '进行中', itemStyle: { color: '#409EFF' } },
-            { value: 72, name: '已完成', itemStyle: { color: '#67C23A' } },
-            { value: 8, name: '未开始', itemStyle: { color: '#909399' } },
-            { value: 3, name: '已暂停', itemStyle: { color: '#E6A23C' } }
-          ],
+          data: statusData,
           emphasis: {
             itemStyle: {
               shadowBlur: 10,
               shadowOffsetX: 0,
               shadowColor: 'rgba(0, 0, 0, 0.5)'
+            },
+            label: {
+              show: true,
+              fontSize: '14',
+              fontWeight: 'bold'
             }
+          },
+          label: {
+            show: statusViewMode.value === 'pie',
+            formatter: '{b}: {c} ({d}%)'
           }
         }
       ]
     }
 
     if (statusViewMode.value === 'bar') {
-      option.xAxis = { type: 'category', data: ['进行中', '已完成', '未开始', '已暂停'] }
-      option.yAxis = { type: 'value' }
+      option.xAxis = {
+        type: 'category',
+        data: statusData.map((item) => item.name),
+        axisLabel: {
+          rotate: 0
+        }
+      }
+      option.yAxis = {
+        type: 'value',
+        axisLabel: {
+          formatter: '{value}'
+        }
+      }
       if (option.series && Array.isArray(option.series) && option.series[0]) {
-        option.series[0].data = [
-          { value: 45, itemStyle: { color: '#409EFF' } },
-          { value: 72, itemStyle: { color: '#67C23A' } },
-          { value: 8, itemStyle: { color: '#909399' } },
-          { value: 3, itemStyle: { color: '#E6A23C' } }
-        ]
+        option.series[0].data = (statusData as Array<any>).map((item) => ({
+          value: item.value,
+          itemStyle: item.itemStyle
+        }))
+        // 使用类型断言解决 label 属性类型问题
+        ;(option.series[0] as any).label = {
+          show: true,
+          position: 'top',
+          formatter: '{c}'
+        }
       }
     }
 
     statusChart.initChart(option)
   }
 
-  const initResourceChart = () => {
-    resourceChart.initChart({
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' }
-      },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: ['张三', '李四', '王五', '赵六', '钱七']
-      },
-      yAxis: { type: 'value', max: 100 },
-      series: [
-        {
-          name: '工作负载',
-          type: 'bar',
-          data: [85, 75, 90, 65, 70],
-          itemStyle: {
-            color: new (window as any).echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#409EFF' },
-              { offset: 1, color: '#66B1FF' }
-            ])
-          }
-        }
-      ]
-    })
-  }
-
-  const updateTrendChart = () => {
-    let seriesData: any[] = []
-    let yAxisName = ''
-
-    switch (trendType.value) {
-      case 'count':
-        seriesData = [10, 15, 20, 28, 35, 45, 55, 65, 75, 85, 95, 128]
-        yAxisName = '项目数量'
-        break
-      case 'completion':
-        seriesData = [65, 68, 72, 75, 78, 82, 85, 88, 90, 92, 94, 95]
-        yAxisName = '完成率 (%)'
-        break
-      case 'budget':
-        seriesData = [85, 82, 78, 75, 72, 70, 68, 65, 62, 60, 58, 55]
-        yAxisName = '预算执行率 (%)'
-        break
-    }
-
-    trendChart.initChart({
-      tooltip: {
-        trigger: 'axis'
-      },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: [
-          '1月',
-          '2月',
-          '3月',
-          '4月',
-          '5月',
-          '6月',
-          '7月',
-          '8月',
-          '9月',
-          '10月',
-          '11月',
-          '12月'
-        ]
-      },
-      yAxis: {
-        type: 'value',
-        name: yAxisName
-      },
-      series: [
-        {
-          name: yAxisName,
-          type: 'line',
-          data: seriesData,
-          smooth: true,
-          itemStyle: { color: '#409EFF' },
-          areaStyle: {
-            color: new (window as any).echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-              { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
-            ])
-          }
-        }
-      ]
-    })
-  }
-
   // 生命周期
   onMounted(() => {
-    initCharts()
+    handleRefresh()
   })
 
   // 监听视图模式变化
   watch(statusViewMode, updateStatusChart)
-  watch(trendType, updateTrendChart)
 </script>
 
 <style scoped>
   .statistics-page {
+    /* 辅助类 */
     .flex-c {
       display: flex;
       align-items: center;
@@ -940,6 +1272,78 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    /* 统一卡片样式 */
+    .art-card {
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .art-card:hover {
+      box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
+    }
+
+    /* 标题样式 */
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--el-color-primary-dark-2);
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--el-color-primary-dark-2);
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--el-color-primary-dark-2);
+    }
+
+    h4 {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--el-color-primary-dark-2);
+    }
+
+    /* 文本样式 */
+    .text-g-600 {
+      color: var(--el-text-color-secondary);
+    }
+
+    .text-g-700 {
+      color: var(--el-text-color-primary);
+    }
+
+    /* 动画效果 */
+    .transition {
+      transition: all 0.3s ease;
+    }
+
+    .transition-shadow {
+      transition: box-shadow 0.3s ease;
+    }
+
+    /* 响应式调整 */
+    @media (width <= 768px) {
+      h1 {
+        font-size: 20px;
+      }
+
+      h2 {
+        font-size: 18px;
+      }
+
+      h3 {
+        font-size: 14px;
+      }
+
+      .art-card {
+        padding: 16px !important;
+      }
     }
   }
 </style>

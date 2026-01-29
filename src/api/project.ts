@@ -29,7 +29,7 @@ export const getProjectList = async (
   params: ProjectListParams = {}
 ): Promise<PaginationResponse<ProjectItem>> => {
   const response = await api.get({
-    url: '/project/projects',
+    url: '/api/project/projects',
     params
   })
   return response as PaginationResponse<ProjectItem>
@@ -38,7 +38,7 @@ export const getProjectList = async (
 // 获取项目详情
 export const getProjectDetail = async (id: number): Promise<ProjectDetailResponse> => {
   const response = await api.get({
-    url: `/project/projects/${id}`
+    url: `/api/project/projects/${id}`
   })
   return response as ProjectDetailResponse
 }
@@ -46,7 +46,7 @@ export const getProjectDetail = async (id: number): Promise<ProjectDetailRespons
 // 创建项目
 export const createProject = async (data: ProjectCreateParams): Promise<ProjectItem> => {
   const response = await api.post({
-    url: '/project/projects',
+    url: '/api/project/projects',
     data
   })
   return response as ProjectItem
@@ -58,7 +58,7 @@ export const updateProject = async (
   data: ProjectCreateParams
 ): Promise<ProjectItem> => {
   const response = await api.put({
-    url: `/project/projects/${id}`,
+    url: `/api/project/projects/${id}`,
     data
   })
   return response as ProjectItem
@@ -67,7 +67,8 @@ export const updateProject = async (
 // 删除项目
 export const deleteProject = async (id: number): Promise<boolean> => {
   const response = await api.del({
-    url: `/project/projects/${id}`
+    url: `/api/project/projects/${id}`,
+    showErrorMessage: false
   })
   return response as boolean
 }
@@ -75,7 +76,7 @@ export const deleteProject = async (id: number): Promise<boolean> => {
 // 批量删除项目
 export const batchDeleteProjects = async (ids: number[]): Promise<boolean> => {
   const response = await api.post({
-    url: '/project/projects/batch-delete',
+    url: '/api/project/projects/batch-delete',
     data: { ids }
   })
   return response as boolean
@@ -84,7 +85,7 @@ export const batchDeleteProjects = async (ids: number[]): Promise<boolean> => {
 // 归档项目
 export const archiveProject = async (id: number): Promise<boolean> => {
   const response = await api.put({
-    url: `/project/projects/${id}/archive`
+    url: `/api/project/projects/${id}/archive`
   })
   return response as boolean
 }
@@ -98,7 +99,7 @@ export const getTaskList = async (
   params: TaskListParams = {}
 ): Promise<PaginationResponse<TaskItem>> => {
   const response = await api.get({
-    url: '/project/tasks',
+    url: '/api/project/tasks',
     params
   })
   return response as PaginationResponse<TaskItem>
@@ -107,7 +108,7 @@ export const getTaskList = async (
 // 获取任务详情
 export const getTaskDetail = async (id: number): Promise<TaskItem> => {
   const response = await api.get({
-    url: `/project/tasks/${id}`
+    url: `/api/project/tasks/${id}`
   })
   return response as TaskItem
 }
@@ -115,7 +116,7 @@ export const getTaskDetail = async (id: number): Promise<TaskItem> => {
 // 创建任务
 export const createTask = async (data: TaskCreateParams): Promise<TaskItem> => {
   const response = await api.post({
-    url: '/project/tasks',
+    url: '/api/project/tasks',
     data
   })
   return response as TaskItem
@@ -124,7 +125,7 @@ export const createTask = async (data: TaskCreateParams): Promise<TaskItem> => {
 // 更新任务
 export const updateTask = async (id: number, data: TaskCreateParams): Promise<TaskItem> => {
   const response = await api.put({
-    url: `/project/tasks/${id}`,
+    url: `/api/project/tasks/${id}`,
     data
   })
   return response as TaskItem
@@ -133,7 +134,7 @@ export const updateTask = async (id: number, data: TaskCreateParams): Promise<Ta
 // 删除任务
 export const deleteTask = async (id: number): Promise<boolean> => {
   const response = await api.del({
-    url: `/project/tasks/${id}`
+    url: `/api/project/tasks/${id}`
   })
   return response as boolean
 }
@@ -144,7 +145,7 @@ export const completeTask = async (
   data: { achievement?: string; attachments?: any[] }
 ): Promise<TaskItem> => {
   const response = await api.put({
-    url: `/project/tasks/${id}/complete`,
+    url: `/api/project/tasks/${id}/complete`,
     data
   })
   return response as TaskItem
@@ -153,7 +154,7 @@ export const completeTask = async (
 // 批量删除任务
 export const batchDeleteTasks = async (ids: number[]): Promise<boolean> => {
   const response = await api.post({
-    url: '/project/tasks/batch-delete',
+    url: '/api/project/tasks/batch-delete',
     data: { ids }
   })
   return response as boolean
@@ -168,7 +169,7 @@ export const getExpenseList = async (
   params: ExpenseListParams = {}
 ): Promise<PaginationResponse<ExpenseItem>> => {
   const response = await api.get({
-    url: '/project/expenses',
+    url: '/api/project/expenses',
     params
   })
   return response as PaginationResponse<ExpenseItem>
@@ -177,7 +178,7 @@ export const getExpenseList = async (
 // 获取费用详情
 export const getExpenseDetail = async (id: number): Promise<ExpenseItem> => {
   const response = await api.get({
-    url: `/project/expenses/${id}`
+    url: `/api/project/expenses/${id}`
   })
   return response as ExpenseItem
 }
@@ -185,7 +186,7 @@ export const getExpenseDetail = async (id: number): Promise<ExpenseItem> => {
 // 创建费用
 export const createExpense = async (data: ExpenseCreateParams): Promise<ExpenseItem> => {
   const response = await api.post({
-    url: '/project/expenses',
+    url: '/api/project/expenses',
     data
   })
   return response as ExpenseItem
@@ -197,7 +198,7 @@ export const updateExpense = async (
   data: ExpenseCreateParams
 ): Promise<ExpenseItem> => {
   const response = await api.put({
-    url: `/project/expenses/${id}`,
+    url: `/api/project/expenses/${id}`,
     data
   })
   return response as ExpenseItem
@@ -206,7 +207,7 @@ export const updateExpense = async (
 // 删除费用
 export const deleteExpense = async (id: number): Promise<boolean> => {
   const response = await api.del({
-    url: `/project/expenses/${id}`
+    url: `/api/project/expenses/${id}`
   })
   return response as boolean
 }
@@ -214,7 +215,16 @@ export const deleteExpense = async (id: number): Promise<boolean> => {
 // 获取财务统计
 export const getFinanceStatistics = async (): Promise<FinanceStatistics> => {
   const response = await api.get({
-    url: '/project/finance/statistics'
+    url: '/api/project/finance/statistics'
   })
   return response as FinanceStatistics
+}
+
+// 获取项目统计数据
+export const getProjectStatistics = async (params: any = {}): Promise<any> => {
+  const response = await api.get({
+    url: '/api/project/statistics',
+    params
+  })
+  return response
 }

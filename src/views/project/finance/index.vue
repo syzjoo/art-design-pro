@@ -271,8 +271,24 @@
     return typeMap[type] || type
   }
 
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('zh-CN')
+  const formatNumber = (num: any) => {
+    // 确保输入是数字类型
+    let numberValue = num
+    if (typeof num === 'string') {
+      // 处理可能的字符串拼接问题
+      if (num.includes('.')) {
+        // 只保留第一个小数点
+        const parts = num.split('.')
+        numberValue = parseFloat(`${parts[0]}.${parts.slice(1).join('')}`)
+      } else {
+        numberValue = parseFloat(num)
+      }
+    }
+    // 检查是否是有效数字
+    if (isNaN(numberValue)) {
+      return '0'
+    }
+    return numberValue.toLocaleString('zh-CN')
   }
 
   const getUsageRateColor = (rate: number) => {

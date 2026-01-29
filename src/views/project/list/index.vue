@@ -349,10 +349,21 @@
         pagination.total = projectList.value.length
       }
       ElMessage.success('删除成功')
-    } catch (error) {
+    } catch (error: any) {
       if (error !== 'cancel') {
         console.error('删除项目失败:', error)
-        ElMessage.error('删除失败，请稍后重试')
+
+        // 检查错误消息
+        const errorMsg = error.message || ''
+
+        // 检查是否有关联任务
+        if (errorMsg.includes('存在任务')) {
+          ElMessage.error('删除失败：请先删除项目任务后再删除项目')
+        } else if (errorMsg.includes('费用记录')) {
+          ElMessage.error('删除失败：项目下存在费用记录，请先删除所有费用记录后再删除项目')
+        } else {
+          ElMessage.error('删除失败，请稍后重试')
+        }
       } else {
         ElMessage.info('已取消删除')
       }

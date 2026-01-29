@@ -34,11 +34,6 @@ export default ({ mode }: { mode: string }) => {
           target: VITE_API_PROXY_URL,
           changeOrigin: true
         },
-        '/project': {
-          target: VITE_API_PROXY_URL,
-          changeOrigin: true,
-          rewrite: (path) => `/api${path}`
-        },
         '/uploads': {
           target: VITE_API_PROXY_URL,
           changeOrigin: true
